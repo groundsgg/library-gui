@@ -1,5 +1,8 @@
 package gg.grounds.gui
 
+import gg.grounds.i18n.MessageKey
+import gg.grounds.i18n.Translations
+import java.util.concurrent.CompletableFuture
 import net.kyori.adventure.text.Component
 import net.minestom.server.MinecraftServer
 import net.minestom.server.entity.Player
@@ -33,6 +36,9 @@ open class Gui(val player: Player, val inventory: Inventory) {
     internal val tracker = SignalTracker()
 
     private val buttons = arrayOfNulls<GuiButton>(size)
+    // Cooldown clocks keyed by slot, not by button: effects re-create buttons on
+    // every run, and a per-instance clock would reset on each re-render.
+    private val slotClocks = arrayOfNulls<Long>(size)
     private val effects = mutableListOf<Effect>()
     private val taskSpecs = mutableListOf<Pair<TaskSchedule, () -> Unit>>()
     private val tasks = mutableListOf<Task>()
@@ -49,8 +55,35 @@ open class Gui(val player: Player, val inventory: Inventory) {
      */
     var preventClose: Boolean = false
 
+    /** Translator for [text]; set once at build time. */
+    var translations: Translations? = null
+
+    /** Renders [key] in this GUI's player's language, via [translations]. */
+    fun text(key: MessageKey, vararg args: Pair<String, Any>): Component {
+        val translations = checkNotNull(translations) { "set gui.translations before using text()" }
+        return translations.render(key, player, *args)
+    }
+
     /** Creates a [Signal] owned by this GUI, for use with [effect]. */
     fun <V> signal(initial: V): Signal<V> = Signal(initial, tracker)
+
+    /**
+     * A signal fed by [future]: starts at [initial] and switches to the result on the tick thread
+     * once the future completes — combine with [effect] to swap a loading placeholder for real data
+     * (`initial = null` infers a nullable signal). A failed future logs and leaves the signal at
+     * [initial]. A completion after the GUI is gone only updates state; nothing is sent.
+     */
+    fun <T> signal(future: CompletableFuture<out T>, initial: T): Signal<T> {
+        val signal = signal(initial)
+        future.whenComplete { value, error ->
+            if (error != null) {
+                LOG.log(System.Logger.Level.WARNING, "async gui signal failed", error)
+            } else {
+                scheduleNextTick { signal.set(value) }
+            }
+        }
+        return signal
+    }
 
     /**
      * Runs [block] immediately and re-runs it whenever a [Signal] read inside it changes. Buttons
@@ -114,6 +147,26 @@ open class Gui(val player: Player, val inventory: Inventory) {
     /** Runs when the GUI goes away, on every close path. */
     fun onClose(handler: () -> Unit) {
         closeHandlers += handler
+    }
+
+    /**
+     * Cycles [frames] through [slot] every [period] while the GUI is open. Animates the button that
+     * occupies the slot *at call time* (an empty slot gets a decoration), keeping its click
+     * handlers; if something re-renders the slot later — an effect, a page flip — the animation
+     * stops rather than stomping the new button. Frames must differ from their neighbours —
+     * Minestom skips the packet for value-equal items. Call from the GUI body, not inside [effect].
+     */
+    fun animate(slot: Int, period: TaskSchedule, frames: List<ItemStack>) {
+        require(slot in 0 until size) { "slot $slot outside 0..${size - 1}" }
+        require(frames.isNotEmpty()) { "frames must not be empty" }
+        val owned = buttons[slot] ?: GuiButton(frames.first()).also { setButton(slot, it) }
+        var index = 0
+        every(period) {
+            if (buttons[slot] !== owned) return@every
+            index = (index + 1) % frames.size
+            owned.item = frames[index]
+            refreshSlot(slot)
+        }
     }
 
     /** Shows the GUI. A GUI the player already has open cleans itself up. */
@@ -187,6 +240,13 @@ open class Gui(val player: Player, val inventory: Inventory) {
         val slot = click.slot()
         if (slot !in 0 until size) return
         val button = buttons[slot] ?: return
+        val cooldown = button.cooldown
+        if (cooldown != null && button.hasHandler(action)) {
+            val now = System.nanoTime()
+            val last = slotClocks[slot]
+            if (last != null && now - last < cooldown.toNanos()) return
+            slotClocks[slot] = now
+        }
         button.dispatch(ClickContext(player, click, slot, action))
     }
 
@@ -211,5 +271,9 @@ open class Gui(val player: Player, val inventory: Inventory) {
 
     private fun scheduleNextTick(block: () -> Unit) {
         MinecraftServer.getSchedulerManager().scheduleNextTick(Runnable { block() })
+    }
+
+    private companion object {
+        val LOG: System.Logger = System.getLogger("gg.grounds.gui")
     }
 }

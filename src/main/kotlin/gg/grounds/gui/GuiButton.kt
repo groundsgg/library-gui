@@ -1,5 +1,6 @@
 package gg.grounds.gui
 
+import java.time.Duration
 import net.minestom.server.entity.Player
 import net.minestom.server.inventory.click.Click
 import net.minestom.server.item.ItemStack
@@ -44,6 +45,12 @@ class GuiButton(var item: ItemStack) {
     private val handlers = mutableMapOf<ClickAction, ClickContext.() -> Unit>()
     private var anyHandler: (ClickContext.() -> Unit)? = null
 
+    /**
+     * Minimum delay between handled clicks; clicks inside the window are swallowed silently. The
+     * clock lives on the GUI, keyed by slot, so it survives effect re-renders replacing the button.
+     */
+    var cooldown: Duration? = null
+
     /** Runs for every actionable click that has no more specific handler. */
     fun onClick(handler: ClickContext.() -> Unit) {
         anyHandler = handler
@@ -66,4 +73,7 @@ class GuiButton(var item: ItemStack) {
         val handler = handlers[context.action] ?: anyHandler ?: return
         handler(context)
     }
+
+    internal fun hasHandler(action: ClickAction): Boolean =
+        action != ClickAction.OTHER && (handlers.containsKey(action) || anyHandler != null)
 }

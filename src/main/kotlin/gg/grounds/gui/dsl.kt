@@ -26,22 +26,23 @@ fun gui(player: Player, title: Component, type: InventoryType, block: Gui.() -> 
     Gui(player, Inventory(type, title)).apply(block)
 
 /**
- * Builds a paged chest GUI. [items] render into every slot except the bottom row, which stays free
- * for navigation — wire buttons there in [block] that call
- * [PagedGui.nextPage]/[PagedGui.previousPage].
+ * Builds a paged chest GUI. By default [items] render into every slot except the bottom row, which
+ * stays free for navigation — call [PagedGui.navigation] in [block], or place your own buttons
+ * there. Pass [contentSlots] (e.g. a [LayoutScope.slots] region) to shape the content area.
  */
 fun <T> pagedGui(
     player: Player,
     title: (page: Int, pageCount: Int) -> Component,
     items: List<T>,
     rows: Int = 6,
+    contentSlots: List<Int>? = null,
     render: (T) -> GuiButton,
     block: PagedGui<T>.() -> Unit = {},
 ): PagedGui<T> {
     require(rows >= 2) { "paged GUI needs at least 2 rows (content + navigation)" }
-    val contentSlots = (0 until (rows - 1) * 9).toList()
+    val slots = contentSlots ?: (0 until (rows - 1) * 9).toList()
     val inventory = Inventory(chestType(rows), title(0, 1))
-    return PagedGui(player, inventory, items, contentSlots, title, render).apply(block)
+    return PagedGui(player, inventory, items, slots, title, render).apply(block)
 }
 
 /** A standalone clickable button, e.g. for [pagedGui]'s render lambda. */

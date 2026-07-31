@@ -4,6 +4,8 @@ import kotlin.math.min
 import net.kyori.adventure.text.Component
 import net.minestom.server.entity.Player
 import net.minestom.server.inventory.Inventory
+import net.minestom.server.item.ItemStack
+import net.minestom.server.item.Material
 
 /** Pure pagination math, kept free of Minestom for testability. Copies [items] defensively. */
 internal class Paginator<T>(items: List<T>, private val pageSize: Int) {
@@ -29,7 +31,8 @@ internal class Paginator<T>(items: List<T>, private val pageSize: Int) {
  * inventory, so page flips don't flicker. Navigation is up to the caller: place buttons that call
  * [nextPage]/[previousPage].
  */
-class PagedGui<T>(
+class PagedGui<T>
+internal constructor(
     player: Player,
     inventory: Inventory,
     items: List<T>,
@@ -41,8 +44,12 @@ class PagedGui<T>(
     private val pageSignal = signal(0)
     private val contentVersion = signal(0)
 
+    /** Reactive: reading this inside an effect re-runs it when [setItems] changes the range. */
     val pageCount: Int
-        get() = paginator.pageCount
+        get() {
+            contentVersion.get()
+            return paginator.pageCount
+        }
 
     /**
      * Current page, zero-based. Writes clamp into range and re-render; a write that doesn't change
@@ -61,7 +68,12 @@ class PagedGui<T>(
             contentSlots.forEachIndexed { index, slot ->
                 setButton(slot, slice.getOrNull(index)?.let(render))
             }
-            titleFor?.let { title(it(current, paginator.pageCount)) }
+            titleFor?.let {
+                val next = it(current, paginator.pageCount)
+                // setTitle re-sends the whole window unconditionally — skip when unchanged,
+                // or every setItems() refresh re-inits the client's screen.
+                if (next != inventory.title) title(next)
+            }
         }
     }
 
@@ -70,6 +82,35 @@ class PagedGui<T>(
         paginator = Paginator(items, contentSlots.size)
         pageSignal.set(paginator.clamp(pageSignal.get()))
         contentVersion.update { it + 1 }
+    }
+
+    /**
+     * Places previous/next buttons that hide themselves at the ends of the range (and entirely on
+     * single-page content). Call once from the GUI body, not inside an effect.
+     */
+    fun navigation(
+        previousSlot: Int = size - 9,
+        nextSlot: Int = size - 1,
+        previousItem: ItemStack = item(Material.ARROW) { name(Component.text("Previous page")) },
+        nextItem: ItemStack = item(Material.ARROW) { name(Component.text("Next page")) },
+    ) {
+        require(previousSlot !in contentSlots && nextSlot !in contentSlots) {
+            "navigation slots ($previousSlot, $nextSlot) overlap the content slots"
+        }
+        effect {
+            contentVersion.get()
+            val current = paginator.clamp(pageSignal.get())
+            if (current > 0) {
+                button(previousSlot, previousItem) { onClick { previousPage() } }
+            } else {
+                setButton(previousSlot, null)
+            }
+            if (current < paginator.pageCount - 1) {
+                button(nextSlot, nextItem) { onClick { nextPage() } }
+            } else {
+                setButton(nextSlot, null)
+            }
+        }
     }
 
     fun nextPage() {
