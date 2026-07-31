@@ -1,0 +1,53 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
+plugins {
+    id("gg.grounds.base-conventions") version "0.8.0"
+    kotlin("jvm") version "2.2.20"
+    `maven-publish`
+}
+
+group = "gg.grounds"
+
+version = findProperty("versionOverride")?.toString() ?: "0.1.0-SNAPSHOT"
+
+kotlin { jvmToolchain(25) }
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    withSourcesJar()
+}
+
+// Minestom itself requires JVM 25+, so there is nothing to gain from a lower target.
+tasks.withType<KotlinCompile>().configureEach { compilerOptions.jvmTarget.set(JvmTarget.JVM_25) }
+
+repositories { mavenCentral() }
+
+dependencies {
+    // The host server supplies Minestom at runtime; this library must never
+    // drag a second copy in.
+    compileOnly("net.minestom:minestom:2026.06.05-26.1.2")
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    // compileOnly is not on the test classpath; the Click-dispatch tests
+    // construct Minestom click records directly.
+    testImplementation("net.minestom:minestom:2026.06.05-26.1.2")
+}
+
+tasks.test { useJUnitPlatform() }
+
+publishing {
+    publications { create<MavenPublication>("maven") { from(components["java"]) } }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/groundsgg/library-gui")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
