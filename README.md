@@ -34,6 +34,39 @@ gui(player, Component.text("Menu"), rows = 3) {
 }.open()
 ```
 
+## Layout
+
+Shape first, contents second — no slot math:
+
+```kotlin
+gui(player, Component.text("Menu"), rows = 3) {
+    layout(
+        "#########",
+        "#       #",
+        "####X####",
+    ) {
+        place('#', item(Material.GRAY_STAINED_GLASS_PANE))
+        place('X', item(Material.BARRIER) { name(Component.text("Close")) }) {
+            onClick { close() }
+        }
+    }
+}.open()
+```
+
+Rows are 9 chars, spaces leave slots untouched. Unbound chars are markers:
+`slots('.')` returns their positions — e.g. as `contentSlots` for `pagedGui`.
+
+## Translations
+
+Per-player GUIs render per-player language (library-i18n):
+
+```kotlin
+gui(player, messages.render(ShopMessage.TITLE, player)) {
+    translations = messages
+    button(4, item(Material.EMERALD) { name(text(ShopMessage.BUY)) }) { /* ... */ }
+}.open()
+```
+
 ## Signals
 
 `effect { }` runs immediately and re-runs whenever a signal it read changes.
@@ -62,16 +95,42 @@ pagedGui(
     player,
     title = { page, pages -> Component.text("Friends ${page + 1}/$pages") },
     items = friends,
-    render = { friend -> button(item(Material.PLAYER_HEAD) { name(friend.name) }) {
+    render = { friend -> button(head(friend.skin) { name(Component.text(friend.name)) }) {
         onClick { /* ... */ }
     } },
 ) {
-    button(size - 9, item(Material.ARROW) { name(Component.text("Previous")) }) {
-        onClick { previousPage() }
+    navigation() // prev/next arrows, auto-hiding at the ends
+}.open()
+```
+
+## More building blocks
+
+```kotlin
+// Player heads (friends, party, leaderboards) — anywhere
+head(player)                     // current skin
+head(skin) { name(displayName) } // PlayerSkin from your data
+
+// Confirm dialog — onCancel also covers closing without choosing
+confirmGui(player, Component.text("Delete party?"), onConfirm = { party.delete() }).open()
+
+// Inside a gui(player, title) { ... } body:
+gui(player, Component.text("Settings")) {
+    // Toggle / cycle buttons backed by signals
+    val notifications = toggleButton(3, off = bellOff, on = bellOn)
+    val region = cycleButton(5, values = regions, render = { it.icon })
+
+    // Async data: placeholder now, real content when the future lands (tick thread)
+    val stats = signal(statsService.fetch(player.uuid), initial = null)
+    effect { button(13, stats.get()?.let(::statsItem) ?: loadingItem) }
+
+    // Click throttle — the clock is per slot, so effect re-renders don't reset it
+    button(8, buyItem) {
+        cooldown = Duration.ofMillis(500)
+        onClick { /* ... */ }
     }
-    button(size - 1, item(Material.ARROW) { name(Component.text("Next")) }) {
-        onClick { nextPage() }
-    }
+
+    // Frame animation — frames must differ, equal items skip the packet
+    animate(0, TaskSchedule.tick(10), listOf(frame1, frame2, frame3))
 }.open()
 ```
 
