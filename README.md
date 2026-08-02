@@ -160,3 +160,10 @@ anvilInput(player, Component.text("Party name")) { text ->
   arrives on roughly every keystroke.
 - **Threading.** Call GUI methods from the tick thread (event handlers and
   scheduler tasks already are).
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE), the same terms every other
+public Grounds repository carries. The repository was public for a while with
+no license file at all, which means "all rights reserved" — this states the
+terms that were always intended.
