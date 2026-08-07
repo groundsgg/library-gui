@@ -142,6 +142,130 @@ anvilInput(player, Component.text("Party name")) { text ->
 }
 ```
 
+## Themes: custom graphics
+
+A theme is the one declaration behind both halves of a custom-looking GUI — the
+resource pack the client downloads, and the components the server sends. Keeping
+those two in sync by hand is what usually breaks; here neither can be generated
+without the other.
+
+```kotlin
+val guiTheme = theme("grounds", PackFormat(88, minInclusive = 84, maxInclusive = 88)) {
+    description = "Grounds GUI"
+    // Background artwork. width/height are the PNG's real size — the generator
+    // fails the build if the file on disk ever disagrees.
+    panel("shop", "panels/shop.png", 176, 166, offsetY = -6)
+    // A graphic that replaces an item's whole appearance.
+    icon("coin", "icons/coin.png")
+    // A hover effect: this button's tooltip is drawn with these sprites.
+    tooltip("gold", "tooltips/gold_bg.png", "tooltips/gold_frame.png")
+}
+```
+
+`PackFormat` is per Minecraft version — read `pack_version.resource_major` out of
+that version's `version.json` rather than guessing (26.2 is 88). The range says
+which clients the pack claims to serve.
+
+Building the pack is a build-time step, not a server one:
+
+```kotlin
+writePack(guiTheme, assets = Path.of("art"), out = Path.of("build/pack"))
+val sha1 = zipPack(Path.of("build/pack"), Path.of("build/grounds-gui.zip"))
+```
+
+Host that zip and hand the client both halves:
+
+```kotlin
+player.sendResourcePacks(
+    ResourcePackRequest.resourcePackRequest()
+        .packs(ResourcePackInfo.resourcePackInfo(id, URI.create(url), sha1))
+        .required(true)
+        .build(),
+)
+```
+
+Using it is the normal DSL — the theme only supplies the title and two item ids:
+
+```kotlin
+gui(player, guiTheme.title("shop", Component.text("Shop")), rows = 3) {
+    button(13, item(Material.PAPER) {
+        name(Component.text("Buy"))
+        itemModel = guiTheme.itemModel("coin")
+        tooltipStyle = guiTheme.tooltipStyle("gold")
+    }) {
+        onClick { /* ... */ }
+    }
+}.open()
+```
+
+### How the background gets there
+
+The client gives a server no way to draw inside a container window. The one piece
+it does control is the *title*, so the artwork rides in as a font glyph: jump to
+the panel's origin, draw the glyph, jump back, then the label. The jumps are
+space glyphs from a fixed power-of-two ladder, so changing `offsetX` or `advance`
+rewrites only the string the server sends — the pack's bytes, and its hash, stay
+put and no client re-downloads for a horizontal nudge.
+
+- **`offsetY` is the exception.** It is pixels below the title's top row
+  (negative moves up), and it becomes the glyph's *ascent*, which lives in the
+  font file. Changing it rebuilds the pack and every client refetches, so settle
+  it once rather than treating it as a runtime knob. A pack whose ascent exceeds
+  its height is rejected by the client, so that combination fails at declaration
+  instead.
+- **`advance` is measured, not guessed.** The client trims fully transparent
+  columns off the right of a glyph before deciding how far it advances, so
+  artwork with a soft right edge consumes less width than it occupies. The
+  generator reproduces that calculation against the real PNG and fails the build
+  with the number to declare, rather than letting the label drift sideways at
+  runtime. Leave `advance` unset unless a build tells you otherwise.
+- **`TITLE_INSET` (-8) is verified.** A container draws its title at
+  `titleLabelX = 8`, `titleLabelY = 6`, and its window is `176 x (114 + rows*18)`
+  — read out of the 26.2 client's `AbstractContainerScreen`/`ContainerScreen`.
+  So a 3-row panel is 176x168 and the default inset puts it flush left.
+- **`TITLE_ASCENT` (7) is still a convention.** It matches the vanilla font's own
+  ascent for 8px glyphs, which is what makes `offsetY` read as "pixels below the
+  title", but the client code that turns an ascent into a screen position was not
+  available to check. Dial `offsetY` once against a real client.
+  `examples/theme-demo` is a server built for exactly that: it boots, serves its
+  own pack, and lets you nudge the offsets from in-game until the artwork lines
+  up, then prints the tuned `panel(...)` line to paste back.
+
+### What hover can and cannot do
+
+The server never learns what the cursor is over — the client sends nothing on
+hover. `tooltipStyle` is the whole sanctioned surface: the client redraws *this*
+item's tooltip with *these* sprites, which is why the effect is chosen per
+button rather than globally. Sprites are nine-sliced, because a tooltip is sized
+by its text and never by us.
+
+The highlight the client paints over the hovered slot is reachable too, but from
+the other direction:
+
+```kotlin
+slotHighlight("highlight/back.png", "highlight/front.png")
+```
+
+That replaces vanilla's own `container/slot_highlight_back` and
+`slot_highlight_front` sprites — drawn 24x24 at four pixels outside the slot,
+`back` under the item and `front` over it. Those four pixels of bleed are what
+make a *glow* possible rather than only a box: put the bloom on `back`, where it
+spills around the item instead of over it, and leave `front` transparent.
+
+Being a vanilla override it is **global**: every slot of every container changes,
+the player's own inventory included, and it cannot be varied per GUI or per
+button. That is structural, not a gap — `Slot.isHighlightable()` is `true` for
+every ordinary slot, the one exception is a client-side class the server never
+selects, and the client never tells the server what the cursor is over. The
+choice is the effect everywhere or nowhere.
+
+Anything past those two — a highlight on one specific slot, an icon that follows
+the cursor — needs a core shader override in the pack, and shaders are per
+Minecraft version. That is deliberately not in here.
+
+Clients that never load the pack see a plain vanilla GUI: the label alone, and
+items in their material's own model. Nothing breaks, it just looks ordinary.
+
 ## Behavior notes
 
 - **Close paths.** Client close, server close, GUI-to-GUI switch and

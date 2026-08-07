@@ -43,7 +43,7 @@ repositories {
 dependencies {
     // The host server supplies Minestom at runtime; this library must never
     // drag a second copy in.
-    compileOnly("net.minestom:minestom:2026.06.05-26.1.2")
+    compileOnly("net.minestom:minestom:2026.07.22-26.2")
     // Per-player GUIs render per-player language; adventure itself comes from
     // Minestom (library-i18n declares it compileOnly), so nothing doubles up.
     api("gg.grounds:library-i18n:0.1.1")
@@ -52,7 +52,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     // compileOnly is not on the test classpath; the Click-dispatch tests
     // construct Minestom click records directly.
-    testImplementation("net.minestom:minestom:2026.06.05-26.1.2")
+    testImplementation("net.minestom:minestom:2026.07.22-26.2")
 }
 
 tasks.test { useJUnitPlatform() }

@@ -7,6 +7,7 @@ import net.minestom.server.entity.Player
 import net.minestom.server.entity.PlayerSkin
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
+import net.minestom.server.item.component.TooltipDisplay
 import net.minestom.server.network.player.ResolvableProfile
 
 /**
@@ -34,6 +35,29 @@ class ItemBuilder(private val material: Material) {
     /** Skin for PLAYER_HEAD items; ignored by the client on other materials. */
     var skin: PlayerSkin? = null
 
+    /**
+     * Item model id (`namespace:path`) that replaces this item's appearance with a themed graphic —
+     * pass `theme.itemModel("...")`. Clients without the pack fall back to the material's own
+     * model, so the button stays visible either way.
+     */
+    var itemModel: String? = null
+
+    /**
+     * Tooltip style id (`namespace:path`) that skins this item's hover tooltip — pass
+     * `theme.tooltipStyle("...")`. This is the only hover state a server can influence at all: the
+     * client never reports what the cursor is over, it just draws *this* item's tooltip with
+     * *these* sprites.
+     */
+    var tooltipStyle: String? = null
+
+    /**
+     * Hides this item's tooltip completely, so hovering it shows nothing at all.
+     *
+     * For fillers, decoration, and anywhere a name box would be noise — and for isolating a hover
+     * effect, since it is the only way to make one item in a screen the only one that reacts.
+     */
+    var hideTooltip: Boolean = false
+
     private var name: Component? = null
     private val lore = mutableListOf<Component>()
 
@@ -57,6 +81,15 @@ class ItemBuilder(private val material: Material) {
         if (lore.isNotEmpty()) stack = stack.withLore(lore.toList())
         if (glowing) stack = stack.withGlowing(true)
         skin?.let { stack = stack.with(DataComponents.PROFILE, ResolvableProfile(it)) }
+        itemModel?.let { stack = stack.with(DataComponents.ITEM_MODEL, it) }
+        tooltipStyle?.let { stack = stack.with(DataComponents.TOOLTIP_STYLE, it) }
+        if (hideTooltip) {
+            stack =
+                stack.with(
+                    DataComponents.TOOLTIP_DISPLAY,
+                    TooltipDisplay.EMPTY.withHideTooltip(true),
+                )
+        }
         return stack
     }
 }
