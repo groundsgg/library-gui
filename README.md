@@ -9,6 +9,11 @@ dependencies {
 }
 ```
 
+## Compatibility
+
+`library-gui` 0.2.x targets Minecraft 26.2 with Minestom `2026.07.22-26.2` and JVM 25.
+The host supplies Minestom; consumers must not shade a second copy.
+
 ## Basics
 
 One `Gui` instance serves one player — Minestom shares a single item array and
@@ -149,7 +154,7 @@ anvilInput(player, Component.text("Party name")) { text ->
   path matters: Minestom fires no `InventoryCloseEvent` when another
   inventory opens over this one. `onClose` handlers run one tick after the
   close — that makes `onClose { parentMenu.open() }` safe (a GUI opened
-  *inside* Minestom's close dispatch would be silently undone).
+  _inside_ Minestom's close dispatch would be silently undone).
 - **`preventClose = true`** reopens the GUI when the client tries to close
   it; `close()` always works.
 - **`every(TaskSchedule.tick(20)) { }`** for animations. Slot updates skip
