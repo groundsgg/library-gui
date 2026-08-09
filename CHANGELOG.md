@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/groundsgg/library-gui/compare/v0.1.0...v0.2.0) (2026-08-09)
+
+
+### Features
+
+* **minestom:** support 26.2 ([#9](https://github.com/groundsgg/library-gui/issues/9)) ([27f0321](https://github.com/groundsgg/library-gui/commit/27f03219dbcf4280a9be8ef22cbd7acbf0307452))
+
 ## 0.1.0 (2026-07-31)
 
 
