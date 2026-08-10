@@ -49,3 +49,12 @@ tasks.named<JavaExec>("run") { workingDir = projectDir }
 tasks.named("distTar") { enabled = false }
 
 tasks.named("distZip") { enabled = false }
+
+// Regenerates the artwork. Needs the raw dumps under art/vanilla; see art/README.md.
+tasks.register<JavaExec>("paintArt") {
+    group = "build"
+    description = "Repaints the demo's panels, frames, tooltips and glyphs"
+    mainClass = "gg.grounds.gui.demo.art.PainterKt"
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = projectDir
+}

@@ -1,7 +1,13 @@
 package gg.grounds.gui.demo
 
 import gg.grounds.gui.art.readSprite
+import gg.grounds.gui.demo.art.paintCoin
+import gg.grounds.gui.demo.art.paintFrames
+import gg.grounds.gui.demo.art.paintInvisible
 import gg.grounds.gui.demo.art.paintMenu
+import gg.grounds.gui.demo.art.paintShop
+import gg.grounds.gui.demo.art.paintSlotHighlight
+import gg.grounds.gui.demo.art.paintTooltips
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import kotlin.io.path.exists
@@ -30,6 +36,45 @@ class MenuArtParityTest {
             }
         }
         return count
+    }
+
+    /** Producers needing no dumps, so this half runs anywhere the repository does. */
+    @Test
+    fun `the painted panels without dumps match the generated ones`() {
+        val produced = Files.createTempDirectory("art")
+        paintShop(produced)
+        paintCoin(produced)
+        paintTooltips(produced)
+        paintSlotHighlight(produced)
+        paintInvisible(produced)
+        paintFrames(produced)
+
+        listOf(
+            "panels/shop.png",
+            "icons/coin.png",
+            "icons/blank.png",
+            "tooltips/gold_bg.png",
+            "tooltips/gold_frame.png",
+            "tooltips/steel_bg.png",
+            "tooltips/steel_frame.png",
+            "tooltips/blank_bg.png",
+            "tooltips/blank_frame.png",
+            "highlight/back.png",
+            "highlight/front.png",
+            "highlight/blank_back.png",
+            "highlight/blank_front.png",
+            "frame/square.png",
+            "frame/triangle.png",
+        )
+            .forEach { name ->
+                val expected = ART.resolve(name)
+                assertTrue(expected.exists(), "missing $name; run art/generate.py")
+                assertEquals(
+                    0,
+                    differences(readSprite(expected), readSprite(produced.resolve(name))),
+                    name,
+                )
+            }
     }
 
     @Test

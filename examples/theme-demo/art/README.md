@@ -1,12 +1,17 @@
 # Demo artwork
 
-`generate.py` draws every panel, frame and tooltip the demo ships. Run it from this directory:
+Every panel, frame, tooltip and glyph the demo ships is painted by the demo itself:
 
 ```
-python3 generate.py
+./gradlew :examples:theme-demo:paintArt
 ```
 
-The PNGs it writes are checked in, so the demo runs from a clone without Python.
+The PNGs it writes are checked in, so the demo runs from a clone without regenerating anything.
+
+This used to be a nine-hundred-line Python generator. Moving it into Kotlin put the four operations
+it rested on — nine-slice, contour from an alpha mask, a patch per slot, a character set cut from a
+font sheet — into the library where a consumer can reach them, and stopped every layout number
+existing twice: once where the pixels were drawn and once where the markers were placed.
 
 ## Why `vanilla/` is not in the repository
 

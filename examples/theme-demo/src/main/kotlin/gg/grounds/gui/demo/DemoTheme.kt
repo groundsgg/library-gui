@@ -189,8 +189,6 @@ object DemoTheme {
                 ?.sorted()
                 ?.forEach { file -> frame(file.removeSuffix(".png"), "frame/$file") }
             (0 until 54).forEach { slot -> frame("mk_cover_$slot", "frame/mk_cover_$slot.png") }
-            frame("menu_small", "frame/menu_small.png")
-            frame("menu_wide", "frame/menu_wide.png")
             frame("slot_cover", "frame/slot_cover.png")
             frame("slot_hover", "frame/slot_hover.png")
             frame("ov_slot", "frame/ov_slot.png")
