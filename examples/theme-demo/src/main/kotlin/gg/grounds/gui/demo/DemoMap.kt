@@ -44,6 +44,11 @@ private val nextMapId = AtomicInteger(1)
  * container GUI that wants runtime imagery is a cartography table, and its layout is fixed — the
  * picture lands at (67, 13) in the window at 66x66, whatever anyone would prefer.
  *
+ * The panel has a hole in it for the same reason. `AbstractContainerScreen.extractContents` runs the
+ * background, then the labels, then the slots — a panel rides in the labels, so an opaque one covers
+ * whatever the screen drew for itself. The first cut of this showed nothing but the item's icon,
+ * which draws after the labels while the map does not.
+ *
  * Relocating it the way a marker relocates a sprite is possible in principle and is not done here.
  * The corner trick the shader uses reads `fract` of the texel coordinate, and the atlas inset that
  * makes that work for a glyph does not exist for a map: its UVs run exactly 0 to 1, so both corners
@@ -57,7 +62,7 @@ fun openMapDemo(player: Player) {
 
     gui(
         player,
-        theme.title("screen_forge", Component.empty(), anchorOf(InventoryType.CARTOGRAPHY)),
+        theme.title("screen_map", Component.empty(), anchorOf(InventoryType.CARTOGRAPHY)),
         InventoryType.CARTOGRAPHY,
     ) {
         button(
