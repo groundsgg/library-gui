@@ -339,6 +339,29 @@ than anywhere else — a dialog is wider than a signed byte can span.
 The shader is per Minecraft version — 26.2 renamed `rendertype_text` to `text`,
 and a pack aimed at the wrong one overrides nothing at all, silently.
 
+### Sharing a client with other packs
+
+A client can hold several server packs at once, so anything a pack writes under
+its own namespace is private and anything it writes under `assets/minecraft` is
+not — one pack wins each of those paths outright, and pack order decides which.
+
+Ask a theme what it claims before shipping it beside another pack:
+
+```kotlin
+theme.vanillaOverrides()
+```
+
+It is derived from the theme rather than written down, because a hand-kept list
+goes stale: the first one here said "the text shader and the slot highlight" and
+was missing the bundle sprites, their `.mcmeta` files and — most quietly —
+`lang/en_us.json`, which a pack owns wholesale even when it replaces two strings.
+A test holds the claim against what the generator actually emits.
+
+Two things about sending a pack matter as much as generating one. Give it a
+**stable id**, or a client treats every rebuild as a different pack and the stack
+grows with each reload. And do not ask to **replace**, or it drops every pack the
+player already holds, including ones this server never sent.
+
 ## Behavior notes
 
 - **Close paths.** Client close, server close, GUI-to-GUI switch and
