@@ -5,12 +5,13 @@ import gg.grounds.gui.art.contour
 import gg.grounds.gui.art.cutGlyphs
 import gg.grounds.gui.art.lightened
 import gg.grounds.gui.art.scaled
-import gg.grounds.gui.art.slotItemX
-import gg.grounds.gui.art.slotItemY
-import gg.grounds.gui.art.slotWellX
-import gg.grounds.gui.art.slotWellY
+import gg.grounds.gui.layout.slotItemX
+import gg.grounds.gui.layout.slotItemY
+import gg.grounds.gui.layout.slotWellX
+import gg.grounds.gui.layout.slotWellY
 import gg.grounds.gui.art.slotPatches
 import gg.grounds.gui.art.writeSprite
+import gg.grounds.gui.demo.MarketLayout
 import java.awt.image.BufferedImage
 import java.nio.file.Path
 import kotlin.io.path.writeText
@@ -19,6 +20,11 @@ import kotlin.io.path.writeText
 private val TALL = containerHeight(6)
 
 private const val TITLE_GREY = 0xFF404040.toInt()
+
+/** The preview well is sunk deeper than a slot, so it reads as a display inside a display. */
+private const val WELL_INK = 0xFF141414.toInt()
+
+private const val WELL_RIM = 0xFF4E4E4E.toInt()
 
 /** The icons the overview's toolbar and the market's controls are cut from. */
 val TOOLBAR_ICONS: List<String> =
@@ -32,13 +38,6 @@ val MARKET_ITEMS: List<String> =
         "arrow", "golden_apple", "apple", "bread", "cooked_beef", "ender_pearl", "elytra", "saddle",
         "name_tag", "emerald", "diamond", "book", "paper", "feather", "stick",
     )
-
-/** The market's card, and the pieces laid out inside it. */
-private val CARD = intArrayOf(7, 76, 162, 50)
-private val CARD_INNER = intArrayOf(CARD[0] + 3, CARD[1] + 3, CARD[2] - 6, CARD[3] - 6)
-private val PREVIEW_WELL = intArrayOf(CARD[0] + 4, CARD[1] + 7, 36, 36)
-private val TEXT_X = PREVIEW_WELL[0] + PREVIEW_WELL[2] + 7
-private val TEXT_RIGHT = CARD[0] + CARD[2] - 6
 
 private fun BufferedImage.centredText(sheet: BufferedImage, text: String, y: Int) {
     drawText(sheet, text, (PANEL_WIDTH - textWidth(sheet, text)) / 2, y, TITLE_GREY, shadow = false)
@@ -203,38 +202,34 @@ fun paintMarket(dumps: Path, out: Path) {
         panel.blit(loadDump(dumps, "gicon_$name"), slotItemX(8), slotItemY(row))
     }
     panel.groupFrame(8, 0, 8, 2)
+    require(MarketLayout.GRID.right == MarketLayout.CARD.right - 18) { "grid and card must share a right edge" }
 
-    panel.sunken(CARD[0], CARD[1], CARD[2], CARD[3], CARD_FILL, CARD_DARK, CARD_LIGHT)
-    panel.sunken(
-        PREVIEW_WELL[0],
-        PREVIEW_WELL[1],
-        PREVIEW_WELL[2],
-        PREVIEW_WELL[3],
-        CARD_DARK,
-        0xFF141414.toInt(),
-        0xFF4E4E4E.toInt(),
+    panel.sunken(MarketLayout.CARD, CARD_FILL, CARD_DARK, CARD_LIGHT)
+    panel.sunken(MarketLayout.PREVIEW_WELL, CARD_DARK, WELL_INK, WELL_RIM)
+    panel.drawText(
+        sheet,
+        "Point at an item",
+        MarketLayout.HINT.x,
+        MarketLayout.HINT.y,
+        TEXT_DIM,
+        shadow = false,
     )
-    panel.drawText(sheet, "Point at an item", TEXT_X, CARD[1] + CARD[3] / 2 - 4, TEXT_DIM, shadow = false)
 
     panel.playerWells(TALL)
     panel.writeSprite(out.resolve("panels/market.png"))
 
-    canvas(CARD_INNER[2], CARD_INNER[3], CARD_FILL).writeSprite(out.resolve("frame/market_card.png"))
+    // Every sprite is sized from the layout, so a card that moves cannot leave a patch behind.
+    canvas(MarketLayout.CARD_INNER.width, MarketLayout.CARD_INNER.height, CARD_FILL)
+        .writeSprite(out.resolve("frame/market_card.png"))
 
-    val wellSprite = canvas(PREVIEW_WELL[2], PREVIEW_WELL[3])
-    wellSprite.sunken(
-        0,
-        0,
-        PREVIEW_WELL[2],
-        PREVIEW_WELL[3],
-        CARD_DARK,
-        0xFF141414.toInt(),
-        0xFF4E4E4E.toInt(),
-    )
+    val well = MarketLayout.PREVIEW_WELL
+    val wellSprite = canvas(well.width, well.height)
+    wellSprite.sunken(0, 0, well.width, well.height, CARD_DARK, WELL_INK, WELL_RIM)
     wellSprite.writeSprite(out.resolve("frame/market_well.png"))
 
     // Not tinted at runtime — unlike the contours and the dialog rule — so this carries its colour.
-    canvas(TEXT_RIGHT - TEXT_X, 1, CARD_RULE).writeSprite(out.resolve("frame/market_rule.png"))
+    canvas(MarketLayout.RULE.width, MarketLayout.RULE.height, CARD_RULE)
+        .writeSprite(out.resolve("frame/market_rule.png"))
 
     // One preview per offer, doubled so it reads as a display rather than as another inventory icon.
     MARKET_ITEMS.forEach { name ->

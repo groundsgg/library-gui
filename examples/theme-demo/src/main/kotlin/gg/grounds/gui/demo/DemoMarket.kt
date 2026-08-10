@@ -5,6 +5,7 @@ import gg.grounds.gui.item
 import gg.grounds.gui.theme.Theme
 import gg.grounds.gui.theme.chestAnchor
 import gg.grounds.gui.theme.containerHeight
+import gg.grounds.gui.layout.Rect
 import gg.grounds.gui.theme.frameMarker
 import gg.grounds.gui.theme.text
 import gg.grounds.gui.theme.textWidth
@@ -20,28 +21,8 @@ import net.minestom.server.item.Material
 private const val ROWS = 6
 private val CLICK = Sound.sound(Key.key("ui.button.click"), Sound.Source.MASTER, 0.4f, 1f)
 
-/**
- * The card's geometry, matching what the generator drew.
- *
- * Every one of these is a pixel in the panel too, which is the awkward part of painting a layout
- * into artwork: the numbers exist twice, in Python and here, and they have to agree. What keeps
- * them honest is that a disagreement is instantly visible — text lands off its own rule.
- */
-private const val CARD_INNER_X = 10
-private const val CARD_INNER_Y = 79
-private const val PREVIEW_WELL_X = 11
-private const val PREVIEW_WELL_Y = 83
-private const val PREVIEW_X = PREVIEW_WELL_X + 2
-private const val PREVIEW_Y = PREVIEW_WELL_Y + 2
-private const val TEXT_X = 54
-private const val TEXT_RIGHT = 163
-
-private const val NAME_Y = 83
-private const val RULE_Y = 94
-private const val NOTE_Y = 98
-private const val COIN_Y = 105
-private const val PRICE_X = TEXT_X + 17
-private const val PRICE_Y = 109
+// The card's geometry is not stated here. It lives in MarketLayout, which the painter reads too —
+// these used to be a second copy of those numbers, kept honest only by a mismatch being visible.
 
 /** Eight columns wide, so the grid ends on the same margins as the card under it. */
 private val GRID_SLOTS: List<Int> = (0..2).flatMap { row -> (0..7).map { col -> row * 9 + col } }
@@ -162,10 +143,18 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
         if (query.isBlank()) CATALOGUE
         else CATALOGUE.filter { it.name.contains(query.trim(), ignoreCase = true) }
 
-    fun marker(id: String, x: Int, y: Int) = theme.frameMarker(id, x, y, imageHeight = height)
+    fun marker(id: String, where: Rect, tint: String? = null) =
+        theme.frameMarker(id, where.x, where.y, imageHeight = height, tint = tint)
 
-    fun line(x: Int, y: Int, body: String, tint: String? = null) =
-        theme.text(GLYPHS, x, y, theme.fit(GLYPHS, body, TEXT_RIGHT - x), imageHeight = height, tint = tint)
+    fun line(where: Rect, body: String, tint: String? = null) =
+        theme.text(
+            GLYPHS,
+            where.x,
+            where.y,
+            theme.fit(GLYPHS, body, where.width),
+            imageHeight = height,
+            tint = tint,
+        )
 
     /**
      * The card, rewritten from scratch on every hover.
@@ -176,16 +165,16 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
      */
     fun card(vararg parts: Component): Component =
         parts.fold(
-            marker("market_card", CARD_INNER_X, CARD_INNER_Y)
-                .append(marker("market_well", PREVIEW_WELL_X, PREVIEW_WELL_Y))
+            marker("market_card", MarketLayout.CARD_INNER)
+                .append(marker("market_well", MarketLayout.PREVIEW_WELL))
         ) { acc, part -> acc.append(part) }
 
     /** A heading and a supporting line, the shape every card on this screen uses. */
     fun heading(title: String, note: String) =
         Component.empty()
-            .append(line(TEXT_X, NAME_Y, title))
-            .append(marker("market_rule", TEXT_X, RULE_Y))
-            .append(line(TEXT_X, NOTE_Y, note, tint = DIM))
+            .append(line(MarketLayout.NAME, title))
+            .append(marker("market_rule", MarketLayout.RULE))
+            .append(line(MarketLayout.NOTE, note, tint = DIM))
 
     gui(player, theme.title("market", Component.empty(), chestAnchor(ROWS)), rows = ROWS) {
         matches.take(GRID_SLOTS.size).forEachIndexed { index, offer ->
@@ -197,10 +186,10 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                     // the cursor on top of it would be the very thing this replaces.
                     name(
                         card(
-                            marker("market_item_${offer.texture}", PREVIEW_X, PREVIEW_Y),
+                            marker("market_item_${offer.texture}", MarketLayout.PREVIEW),
                             heading(offer.name, offer.note),
-                            marker("market_coin", TEXT_X - 1, COIN_Y),
-                            line(PRICE_X, PRICE_Y, offer.price.toString(), tint = priceTint(offer.price)),
+                            marker("market_coin", MarketLayout.COIN),
+                            line(MarketLayout.PRICE, offer.price.toString(), tint = priceTint(offer.price)),
                         )
                     )
                     tooltipStyle = theme.tooltipStyle(DemoTheme.BLANK)
