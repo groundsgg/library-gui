@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/groundsgg/library-gui/compare/v0.2.0...v0.3.0) (2026-08-10)
+
+
+### Features
+
+* resource-pack GUI theming with markers, runtime text and tinting ([bffc7c0](https://github.com/groundsgg/library-gui/commit/bffc7c00756ef18a38e5379657e877608792460b))
+
 ## [0.2.0](https://github.com/groundsgg/library-gui/compare/v0.1.0...v0.2.0) (2026-08-09)
 
 
