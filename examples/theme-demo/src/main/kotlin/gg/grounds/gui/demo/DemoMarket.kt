@@ -18,6 +18,7 @@ import net.kyori.adventure.sound.Sound
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.minestom.server.entity.Player
+import net.minestom.server.inventory.click.Click
 import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
 import net.minestom.server.timer.TaskSchedule
@@ -38,11 +39,14 @@ private val GRID_SLOTS: List<Int> = (0..2).flatMap { row -> (0..7).map { col -> 
  * button reached only one of them, and the screen threw on open with a frame it had never
  * declared.
  */
-internal val MARKET_CONTROLS = listOf("search" to 8, "close" to 17, "question" to 26)
+internal val MARKET_CONTROLS = listOf("search" to 8, "arrow_left" to 17, "arrow_right" to 26)
 
 private const val SEARCH_SLOT = 8
-private const val CLEAR_SLOT = 17
-private const val HELP_SLOT = 26
+private const val PREV_SLOT = 17
+private const val NEXT_SLOT = 26
+
+/** A page is the whole grid. Clearing a filter folded into search: an empty query shows everything. */
+private val PAGE_SIZE = GRID_SLOTS.size
 
 /**
  * One row of the shop.
@@ -68,7 +72,7 @@ private class Offer(
         get() = ((name.length * 37 + price) % 101) / 100.0
 }
 
-/** Twenty-one offers in a twenty-four slot grid, so the trailing tiles show the empty state too. */
+/** More offers than a page holds, which is the only way paging demonstrates anything. */
 private val CATALOGUE =
     listOf(
         Offer(Material.DIAMOND_SWORD, "diamond_sword", "Diamond Sword", 240, "Sharpness III"),
@@ -92,6 +96,30 @@ private val CATALOGUE =
         Offer(Material.PAPER, "paper", "Paper", 2, "For maps and books"),
         Offer(Material.FEATHER, "feather", "Feather", 3, "For arrows"),
         Offer(Material.STICK, "stick", "Stick", 1, "For everything else"),
+        Offer(Material.GOLD_INGOT, "gold_ingot", "Gold Ingot", 45, "Soft but pretty"),
+        Offer(Material.IRON_INGOT, "iron_ingot", "Iron Ingot", 20, "The workhorse"),
+        Offer(Material.COAL, "coal", "Coal", 5, "Smelts eight"),
+        Offer(Material.REDSTONE, "redstone", "Redstone", 9, "For contraptions"),
+        Offer(Material.LAPIS_LAZULI, "lapis_lazuli", "Lapis Lazuli", 14, "For enchanting"),
+        Offer(Material.QUARTZ, "quartz", "Quartz", 11, "From the Nether"),
+        Offer(Material.AMETHYST_SHARD, "amethyst_shard", "Amethyst Shard", 22, "Grows in geodes"),
+        Offer(Material.COPPER_INGOT, "copper_ingot", "Copper Ingot", 7, "Weathers over time"),
+        Offer(Material.FLINT, "flint", "Flint", 4, "Struck from gravel"),
+        Offer(Material.CLAY_BALL, "clay_ball", "Clay Ball", 3, "Fires into brick"),
+        Offer(Material.BRICK, "brick", "Brick", 6, "Fired clay"),
+        Offer(Material.LEATHER, "leather", "Leather", 10, "Armour and books"),
+        Offer(Material.SLIME_BALL, "slime_ball", "Slime Ball", 16, "Sticky by nature"),
+        Offer(Material.HONEYCOMB, "honeycomb", "Honeycomb", 18, "Waxes copper"),
+        Offer(Material.BLAZE_ROD, "blaze_rod", "Blaze Rod", 95, "Fuel for brewing"),
+        Offer(Material.GHAST_TEAR, "ghast_tear", "Ghast Tear", 140, "Regeneration"),
+        Offer(Material.MAGMA_CREAM, "magma_cream", "Magma Cream", 60, "Fire resistance"),
+        Offer(Material.NETHER_STAR, "nether_star", "Nether Star", 1200, "One per wither"),
+        Offer(Material.PHANTOM_MEMBRANE, "phantom_membrane", "Phantom Membrane", 75, "Mends elytra"),
+        Offer(Material.PRISMARINE_SHARD, "prismarine_shard", "Prismarine Shard", 13, "From the deep"),
+        Offer(Material.NAUTILUS_SHELL, "nautilus_shell", "Nautilus Shell", 260, "Builds a conduit"),
+        Offer(Material.ECHO_SHARD, "echo_shard", "Echo Shard", 320, "From the deep dark"),
+        Offer(Material.RABBIT_HIDE, "rabbit_hide", "Rabbit Hide", 8, "Four make leather"),
+        Offer(Material.PRISMARINE_CRYSTALS, "prismarine_crystals", "Prismarine Crystals", 21, "Glows faintly"),
     )
 
 /** The preview frames the catalogue can ask for, so a test can check they all exist. */
@@ -99,8 +127,8 @@ internal val MARKET_TEXTURES: List<String> = CATALOGUE.map { it.texture }
 
 /** Every string the card can write, so a test can lay each one out where it will really go. */
 internal val MARKET_LINES: List<String> =
-    CATALOGUE.flatMap { listOf(it.name, it.note, it.price.toString()) } +
-        listOf("Search", "Type part of a name", "Clear", "Nothing filtered", "How this works", "Hover writes here")
+    CATALOGUE.flatMap { listOf(it.name, it.note, it.price.toString(), "99 x ${it.price}") } +
+        listOf("Search", "Type part of a name", "Previous", "Next", "Page 1 of 2", "45 of 45")
 
 /** The fixed pieces of the card, named once. */
 internal val MARKET_CARD_PARTS: List<String> = listOf("card", "well", "rule", "coin")
@@ -120,8 +148,19 @@ internal fun priceTint(price: Int): String =
         else -> PREMIUM
     }
 
-/** What each player is currently filtering by. Empty means the whole catalogue. */
+/**
+ * What each player is filtering by, and which page they are on.
+ *
+ * State a container GUI holds between renders, which is the point of this screen's second half: a
+ * chest has no memory of its own, so anything that persists across a click lives here and is
+ * re-rendered from scratch.
+ */
 private val queries = mutableMapOf<UUID, String>()
+
+private val pages = mutableMapOf<UUID, Int>()
+
+/** How many of each offer a player has put in the basket, keyed by texture since that is unique. */
+private val baskets = mutableMapOf<UUID, MutableMap<String, Int>>()
 
 /** The key the search dialog reports back under, routed by the listener in Main. */
 const val MARKET_SEARCH: String = "market_search"
@@ -155,6 +194,14 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
     val matches =
         if (query.isBlank()) CATALOGUE
         else CATALOGUE.filter { it.name.contains(query.trim(), ignoreCase = true) }
+
+    // A filter that leaves fewer pages than the one being read has to pull the reader back, or the
+    // screen opens on a page that no longer exists and looks empty for no stated reason.
+    val pageCount = maxOf(1, (matches.size + PAGE_SIZE - 1) / PAGE_SIZE)
+    val page = (pages[player.uuid] ?: 0).coerceIn(0, pageCount - 1)
+    pages[player.uuid] = page
+    val shown = matches.drop(page * PAGE_SIZE).take(PAGE_SIZE)
+    val basket = baskets.getOrPut(player.uuid) { mutableMapOf() }
 
     fun marker(id: String, where: Rect, tint: String? = null) =
         theme.frameMarker(id, where.x, where.y, imageHeight = height, tint = tint)
@@ -190,7 +237,7 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
             .append(line(MarketLayout.NOTE, note, tint = DIM))
 
     gui(player, theme.title("market", Component.empty(), chestAnchor(ROWS)), rows = ROWS) {
-        matches.take(GRID_SLOTS.size).forEachIndexed { index, offer ->
+        shown.forEachIndexed { index, offer ->
             val slot = GRID_SLOTS[index]
             button(
                 slot,
@@ -200,9 +247,19 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                     name(
                         card(
                             marker("market_item_${offer.texture}", MarketLayout.PREVIEW),
-                            heading(offer.name, offer.note),
+                            heading(
+                                offer.name,
+                                basket[offer.texture]?.takeIf { it > 0 }?.let { "$it x ${offer.price}" }
+                                    ?: offer.note,
+                            ),
                             marker("market_coin", MarketLayout.COIN),
-                            line(MarketLayout.PRICE, offer.price.toString(), tint = priceTint(offer.price)),
+                            // With something in the basket the card shows the running total rather
+                            // than the unit price, and says how it got there on the line above.
+                            line(
+                                MarketLayout.PRICE,
+                                (offer.price * maxOf(1, basket[offer.texture] ?: 0)).toString(),
+                                tint = priceTint(offer.price),
+                            ),
                             // The groove first, then the bar clipped to what is left. One sprite
                             // serves every value — a frame per step would be sixty-eight of them.
                             marker("market_track", MarketLayout.TRACK),
@@ -218,13 +275,14 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                     tooltipStyle = theme.tooltipStyle(DemoTheme.BLANK)
                 },
             ) {
+                // No extra controls for a stepper: the click already says which way. Left adds one,
+                // right takes one back, and the card is rebuilt from the basket either way.
                 onClick {
                     player.playSound(CLICK)
-                    player.sendMessage(
-                        Component.text("Bought ", NamedTextColor.GRAY)
-                            .append(Component.text(offer.name, NamedTextColor.WHITE))
-                            .append(Component.text(" for ${offer.price}", NamedTextColor.GOLD))
-                    )
+                    val held = basket[offer.texture] ?: 0
+                    val next = if (click is Click.Right) held - 1 else held + 1
+                    if (next <= 0) basket.remove(offer.texture) else basket[offer.texture] = next
+                    openMarket(player, query)
                 }
             }
         }
@@ -232,7 +290,7 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
         // A container cannot read a keystroke, so search hands off to a dialog and the dialog hands
         // back a string. All three controls are built in one place so the animation below can
         // rebuild them without restating what they are.
-        controls(theme, height, query, matches.size) { slot, itemStack ->
+        controls(theme, height, query, matches.size, page) { slot, itemStack ->
             button(slot, itemStack) { onClick { onControl(player, slot, query) } }
         }
 
@@ -247,13 +305,13 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
         var tick = 0L
         every(TaskSchedule.tick(1)) {
             tick++
-            controls(theme, height, query, matches.size, tick) { slot, itemStack ->
+            controls(theme, height, query, matches.size, page, tick) { slot, itemStack ->
                 button(slot, itemStack) { onClick { onControl(player, slot, query) } }
             }
         }
 
         // A filtered catalogue leaves holes in the grid; they behave like every other empty tile.
-        val used = GRID_SLOTS.take(matches.size) + listOf(SEARCH_SLOT, CLEAR_SLOT, HELP_SLOT)
+        val used = GRID_SLOTS.take(shown.size) + listOf(SEARCH_SLOT, PREV_SLOT, NEXT_SLOT)
         (0 until ROWS * 9).filterNot(used::contains).forEach { slot ->
             button(slot, blankTile(theme, height, slot)) {}
         }
@@ -283,7 +341,7 @@ private fun cardOf(theme: Theme, height: Int, title: String, note: String): Comp
         .append(line(MarketLayout.NOTE, note, tint = DIM))
 }
 
-/** What a control does when pressed. Search leaves the container; the others stay in it. */
+/** What a control does when pressed. Search leaves the container; paging stays in it. */
 private fun onControl(player: Player, slot: Int, query: String) {
     player.playSound(CLICK)
     when (slot) {
@@ -291,18 +349,19 @@ private fun onControl(player: Player, slot: Int, query: String) {
             player.closeInventory()
             player.showDialog(marketSearchDialog(query))
         }
-        CLEAR_SLOT -> openMarket(player, "")
-        else ->
-            player.sendMessage(
-                Component.text("The card is part of the window, not a tooltip: ", NamedTextColor.GRAY)
-                    .append(
-                        Component.text(
-                            "every line is drawn by markers the hovered item carries.",
-                            NamedTextColor.WHITE,
-                        )
-                    )
-            )
+        PREV_SLOT -> turn(player, -1, query)
+        else -> turn(player, 1, query)
     }
+}
+
+/** Turns the page, wrapping, so neither end of a catalogue is a dead button. */
+private fun turn(player: Player, by: Int, query: String) {
+    val matches =
+        if (query.isBlank()) CATALOGUE
+        else CATALOGUE.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    val pageCount = maxOf(1, (matches.size + PAGE_SIZE - 1) / PAGE_SIZE)
+    pages[player.uuid] = ((pages[player.uuid] ?: 0) + by).mod(pageCount)
+    openMarket(player, query)
 }
 
 /**
@@ -316,16 +375,17 @@ private fun Gui.controls(
     height: Int,
     query: String,
     matches: Int,
+    page: Int = 0,
     tick: Long = 0,
     place: (Int, ItemStack) -> Unit,
 ) {
     val tint = ACCENT_PULSE.pingPong(tick)
-    val filterNote = if (query.isBlank()) "Nothing filtered" else "$matches of ${CATALOGUE.size} shown"
+    val pageCount = maxOf(1, (matches + PAGE_SIZE - 1) / PAGE_SIZE)
     val cards =
         listOf(
-            "Search" to "Type part of a name",
-            "Clear" to filterNote,
-            "How this works" to "Hover writes here",
+            "Search" to if (query.isBlank()) "Type part of a name" else "$matches of ${CATALOGUE.size}",
+            "Previous" to "Page ${page + 1} of $pageCount",
+            "Next" to "Page ${page + 1} of $pageCount",
         )
     MARKET_CONTROLS.forEachIndexed { row, (icon, slot) ->
         val (title, note) = cards[row]
