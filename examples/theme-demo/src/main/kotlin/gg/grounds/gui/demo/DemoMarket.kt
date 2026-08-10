@@ -1,5 +1,6 @@
 package gg.grounds.gui.demo
 
+import gg.grounds.gui.Gui
 import gg.grounds.gui.gui
 import gg.grounds.gui.item
 import gg.grounds.gui.theme.Theme
@@ -16,7 +17,9 @@ import net.kyori.adventure.sound.Sound
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.minestom.server.entity.Player
+import net.minestom.server.item.ItemStack
 import net.minestom.server.item.Material
+import net.minestom.server.timer.TaskSchedule
 
 private const val ROWS = 6
 private val CLICK = Sound.sound(Key.key("ui.button.click"), Sound.Source.MASTER, 0.4f, 1f)
@@ -206,46 +209,26 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
             }
         }
 
-        // The search control. A container cannot read a keystroke, so the button hands off to a
-        // dialog and the dialog hands back a string.
-        button(
-            SEARCH_SLOT,
-            control(theme, height, "search", 0, card(heading("Search", "Type part of a name"))),
-        ) {
-            onClick {
-                player.playSound(CLICK)
-                player.closeInventory()
-                player.showDialog(marketSearchDialog(query))
-            }
+        // A container cannot read a keystroke, so search hands off to a dialog and the dialog hands
+        // back a string. All three controls are built in one place so the animation below can
+        // rebuild them without restating what they are.
+        controls(theme, height, query, matches.size) { slot, itemStack ->
+            button(slot, itemStack) { onClick { onControl(player, slot, query) } }
         }
 
-        val filterNote =
-            if (query.isBlank()) "Nothing filtered" else "${matches.size} of ${CATALOGUE.size} shown"
-        button(
-            CLEAR_SLOT,
-            control(theme, height, "close", 1, card(heading("Clear", filterNote))),
-        ) {
-            onClick {
-                player.playSound(CLICK)
-                openMarket(player, "")
-            }
-        }
-
-        button(
-            HELP_SLOT,
-            control(theme, height, "question", 2, card(heading("How this works", "Hover writes here"))),
-        ) {
-            onClick {
-                player.playSound(CLICK)
-                player.sendMessage(
-                    Component.text("The card is part of the window, not a tooltip: ", NamedTextColor.GRAY)
-                        .append(
-                            Component.text(
-                                "every line is drawn by markers the hovered item carries.",
-                                NamedTextColor.WHITE,
-                            )
-                        )
-                )
+        // The controls breathe while hovered, which is the whole of "animation" here: a marker is
+        // part of an item's tooltip, so re-sending the slot changes what is drawn. Nothing about
+        // the pack moves — the pulse walks three declared colours, and the sprite is the same white
+        // contour at every step.
+        //
+        // Only the player pointing at a control ever sees it. A marker draws inside a tooltip and a
+        // tooltip renders for one slot at a time, so there is no ambient motion to be had; the
+        // panel itself rides in the window title, which cannot change without reopening the window.
+        var tick = 0L
+        every(TaskSchedule.tick(1)) {
+            tick++
+            controls(theme, height, query, matches.size, tick) { slot, itemStack ->
+                button(slot, itemStack) { onClick { onControl(player, slot, query) } }
             }
         }
 
@@ -258,11 +241,90 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
         .open()
 }
 
+/** The card's fixed frame plus a heading and its supporting line, for a control's explanation. */
+private fun cardOf(theme: Theme, height: Int, title: String, note: String): Component {
+    fun marker(id: String, where: Rect, tint: String? = null) =
+        theme.frameMarker(id, where.x, where.y, imageHeight = height, tint = tint)
+
+    fun line(where: Rect, body: String, tint: String? = null) =
+        theme.text(
+            GLYPHS,
+            where.x,
+            where.y,
+            theme.fit(GLYPHS, body, where.width),
+            imageHeight = height,
+            tint = tint,
+        )
+
+    return marker("market_card", MarketLayout.CARD_INNER)
+        .append(marker("market_well", MarketLayout.PREVIEW_WELL))
+        .append(line(MarketLayout.NAME, title))
+        .append(marker("market_rule", MarketLayout.RULE))
+        .append(line(MarketLayout.NOTE, note, tint = DIM))
+}
+
+/** What a control does when pressed. Search leaves the container; the others stay in it. */
+private fun onControl(player: Player, slot: Int, query: String) {
+    player.playSound(CLICK)
+    when (slot) {
+        SEARCH_SLOT -> {
+            player.closeInventory()
+            player.showDialog(marketSearchDialog(query))
+        }
+        CLEAR_SLOT -> openMarket(player, "")
+        else ->
+            player.sendMessage(
+                Component.text("The card is part of the window, not a tooltip: ", NamedTextColor.GRAY)
+                    .append(
+                        Component.text(
+                            "every line is drawn by markers the hovered item carries.",
+                            NamedTextColor.WHITE,
+                        )
+                    )
+            )
+    }
+}
+
+/**
+ * Builds all three controls at [tick]'s point in the pulse and hands each to [place].
+ *
+ * One place, because the animation rebuilds them every tick and a second description of what a
+ * control is would drift from this one within a day.
+ */
+private fun Gui.controls(
+    theme: Theme,
+    height: Int,
+    query: String,
+    matches: Int,
+    tick: Long = 0,
+    place: (Int, ItemStack) -> Unit,
+) {
+    val tint = ACCENT_PULSE.pingPong(tick)
+    val filterNote = if (query.isBlank()) "Nothing filtered" else "$matches of ${CATALOGUE.size} shown"
+    val cards =
+        listOf(
+            "Search" to "Type part of a name",
+            "Clear" to filterNote,
+            "How this works" to "Hover writes here",
+        )
+    MARKET_CONTROLS.forEachIndexed { row, (icon, slot) ->
+        val (title, note) = cards[row]
+        place(slot, control(theme, height, icon, row, cardOf(theme, height, title, note), tint))
+    }
+}
+
 /**
  * A control in the spare column: the icon is painted into the panel, the hover traces its contour
  * and writes its own explanation into the card.
  */
-private fun control(theme: Theme, height: Int, icon: String, row: Int, explanation: Component) =
+private fun control(
+    theme: Theme,
+    height: Int,
+    icon: String,
+    row: Int,
+    explanation: Component,
+    tint: String = ACCENT,
+) =
     item(Material.BUNDLE) {
         name(
             Component.empty()
@@ -272,7 +334,7 @@ private fun control(theme: Theme, height: Int, icon: String, row: Int, explanati
                         8 + 18 * 8 - 2,
                         18 + 18 * row - 2,
                         imageHeight = height,
-                        tint = ACCENT,
+                        tint = tint,
                     )
                 )
                 .append(explanation)

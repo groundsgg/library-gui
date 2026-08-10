@@ -4,6 +4,7 @@ import gg.grounds.gui.pack.writePack
 import gg.grounds.gui.pack.zipPack
 import gg.grounds.gui.theme.PackFormat
 import gg.grounds.gui.theme.TITLE_INSET
+import gg.grounds.gui.theme.Sequence
 import gg.grounds.gui.theme.Theme
 import gg.grounds.gui.theme.theme
 import java.nio.file.Path
@@ -34,8 +35,22 @@ internal const val STANDARD: String = "standard"
 
 internal const val PREMIUM: String = "premium"
 
-/** The outline colour, so the theme's accent lives here instead of inside ten PNGs. */
+/**
+ * The outline colour, so the theme's accent lives here instead of inside ten PNGs.
+ *
+ * Three steps of it, because animating a marker means naming a different colour rather than
+ * blending one: the palette is a constant array in the shader, so what a pulse walks through is
+ * declared entries. Costs no sprites at all.
+ */
 internal const val ACCENT: String = "accent"
+
+internal const val ACCENT_MID: String = "accent_mid"
+
+internal const val ACCENT_LOW: String = "accent_low"
+
+/** The pulse a hovered control's contour breathes with, six ticks out and six back. */
+internal val ACCENT_PULSE: Sequence<String> =
+    Sequence(listOf(ACCENT_LOW, ACCENT_MID, ACCENT), ticksPerStep = 3)
 
 /**
  * Codepoint to pen advance, read back from what the generator measured.
@@ -172,6 +187,8 @@ object DemoTheme {
             colour(GOLD, 0xFFC24A)
             colour(PREMIUM, 0xFF7A45)
             colour(ACCENT, 0x2F7FD6)
+            colour(ACCENT_MID, 0x2361A2)
+            colour(ACCENT_LOW, 0x17436E)
             glyphs(GLYPHS, "glyph_", GLYPH_ADVANCES)
             GLYPH_ADVANCES.keys
                 .filter { code -> ART.resolve("frame/glyph_$code.png").exists() }
