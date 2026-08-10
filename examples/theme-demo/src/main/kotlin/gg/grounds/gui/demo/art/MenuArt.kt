@@ -1,8 +1,8 @@
 package gg.grounds.gui.demo.art
 
 import gg.grounds.gui.art.nineSlice
-import gg.grounds.gui.art.slotWellX
-import gg.grounds.gui.art.slotWellY
+import gg.grounds.gui.layout.slotWellX
+import gg.grounds.gui.layout.slotWellY
 import gg.grounds.gui.art.writeSprite
 import java.awt.image.BufferedImage
 import java.nio.file.Path

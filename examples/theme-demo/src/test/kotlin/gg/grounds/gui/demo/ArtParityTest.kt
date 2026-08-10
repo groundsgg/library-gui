@@ -1,6 +1,6 @@
 package gg.grounds.gui.demo
 
-import gg.grounds.gui.art.ITEM_AREA
+import gg.grounds.gui.layout.ITEM_AREA
 import gg.grounds.gui.art.contour
 import gg.grounds.gui.art.readSprite
 import gg.grounds.gui.art.slotPatches

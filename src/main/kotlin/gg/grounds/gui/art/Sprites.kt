@@ -1,5 +1,9 @@
 package gg.grounds.gui.art
 
+import gg.grounds.gui.layout.ITEM_AREA
+import gg.grounds.gui.layout.Rect
+import gg.grounds.gui.layout.slotItemX
+import gg.grounds.gui.layout.slotItemY
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -24,25 +28,6 @@ import kotlin.io.path.outputStream
  * They work on [BufferedImage] rather than on a sprite type of their own, because the pack
  * generator already does and a second representation would only exist to be converted.
  */
-
-/** Where a slot's well is drawn, in window pixels. A slot's item area sits one pixel inside it. */
-const val SLOT_ORIGIN_X: Int = 7
-
-const val SLOT_ORIGIN_Y: Int = 17
-
-/** Slots are a fixed distance apart, which is what every layout here is pinned to. */
-const val SLOT_PITCH: Int = 18
-
-/** The 16x16 a slot's item is drawn in — and exactly the extent of vanilla's hover box. */
-const val ITEM_AREA: Int = 16
-
-fun slotWellX(column: Int): Int = SLOT_ORIGIN_X + SLOT_PITCH * column
-
-fun slotWellY(row: Int): Int = SLOT_ORIGIN_Y + SLOT_PITCH * row
-
-fun slotItemX(column: Int): Int = slotWellX(column) + 1
-
-fun slotItemY(row: Int): Int = slotWellY(row) + 1
 
 /** Reads a PNG, failing with the path rather than with a null. */
 fun readSprite(path: Path): BufferedImage {
@@ -126,6 +111,9 @@ private fun canvas(width: Int, height: Int): BufferedImage {
     require(width > 0 && height > 0) { "a sprite is at least 1x1, got ${width}x$height" }
     return BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
 }
+
+/** The part of this sprite [rect] covers, as its own image. */
+fun BufferedImage.crop(rect: Rect): BufferedImage = crop(rect.x, rect.y, rect.width, rect.height)
 
 /** A rectangle of this sprite, as its own image. */
 fun BufferedImage.crop(x: Int, y: Int, width: Int, height: Int): BufferedImage {

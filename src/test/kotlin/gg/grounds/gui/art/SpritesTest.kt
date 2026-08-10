@@ -1,5 +1,8 @@
 package gg.grounds.gui.art
 
+import gg.grounds.gui.layout.ITEM_AREA
+import gg.grounds.gui.layout.slotItemX
+import gg.grounds.gui.layout.slotItemY
 import java.awt.image.BufferedImage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,16 +28,6 @@ class SpritesTest {
                 }
             }
         }
-
-    @Test
-    fun `slot geometry matches what a container actually uses`() {
-        // A well at (7 + 18c, 17 + 18r) with the item area one pixel inside it. Every layout in
-        // this library is pinned to these two numbers, so they are worth stating once.
-        assertEquals(7, slotWellX(0))
-        assertEquals(151, slotWellX(8))
-        assertEquals(8, slotItemX(0))
-        assertEquals(18 + 18 * 5, slotItemY(5))
-    }
 
     @Test
     fun `nine slice keeps its corners and tiles the middle`() {
