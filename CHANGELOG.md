@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/groundsgg/library-gui/compare/v0.4.0...v0.4.1) (2026-08-10)
+
+
+### Performance Improvements
+
+* **theme:** one glyph per sprite, not per name ([#19](https://github.com/groundsgg/library-gui/issues/19)) ([536c3bc](https://github.com/groundsgg/library-gui/commit/536c3bcdab3fbd40585946be8926426078e535ca))
+
 ## [0.4.0](https://github.com/groundsgg/library-gui/compare/v0.3.0...v0.4.0) (2026-08-10)
 
 
