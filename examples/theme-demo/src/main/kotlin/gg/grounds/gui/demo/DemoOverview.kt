@@ -134,15 +134,15 @@ fun openOverview(player: Player) {
             val slot = TOOLBAR_SLOTS[index]
             val x = 8 + 18 * (slot % 9)
             val y = 18 + 18 * TOOLBAR_ROW
-            fun marker(id: String, dx: Int, dy: Int) =
-                theme.frameMarker(id, x + dx, y + dy, imageHeight = height)
+            fun marker(id: String, dx: Int, dy: Int, tint: String? = null) =
+                theme.frameMarker(id, x + dx, y + dy, imageHeight = height, tint = tint)
 
             val hover =
                 Component.empty()
                     .append(marker("ov_cover", 0, 0))
                     // The contour sprite is 20x20 with the icon's mask at (2, 2), so both rings
                     // clear the edges; that inset is what the -2 undoes.
-                    .append(marker("ov_outline_$icon", -2, -2))
+                    .append(marker("ov_outline_$icon", -2, -2, tint = ACCENT))
                     .append(marker("ov_icon_$icon", 0, 0))
 
             button(slot, blank(theme, hover)) {

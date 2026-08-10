@@ -111,6 +111,21 @@ internal val MARKET_LINES: List<String> =
 /** The fixed pieces of the card, named once. */
 internal val MARKET_CARD_PARTS: List<String> = listOf("card", "well", "rule", "coin")
 
+/**
+ * The colour a price is written in.
+ *
+ * Bands rather than a gradient: the eye separates four steps at a glance and reads a continuum as
+ * noise. Cheap deliberately recedes into the same weight as the note beside it — a stick costing
+ * one coin is not information worth shouting.
+ */
+internal fun priceTint(price: Int): String =
+    when {
+        price < 10 -> DIM
+        price < 100 -> STANDARD
+        price < 300 -> GOLD
+        else -> PREMIUM
+    }
+
 /** What each player is currently filtering by. Empty means the whole catalogue. */
 private val queries = mutableMapOf<UUID, String>()
 
@@ -185,7 +200,7 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                             marker("market_item_${offer.texture}", PREVIEW_X, PREVIEW_Y),
                             heading(offer.name, offer.note),
                             marker("market_coin", TEXT_X - 1, COIN_Y),
-                            line(PRICE_X, PRICE_Y, offer.price.toString(), tint = GOLD),
+                            line(PRICE_X, PRICE_Y, offer.price.toString(), tint = priceTint(offer.price)),
                         )
                     )
                     tooltipStyle = theme.tooltipStyle(DemoTheme.BLANK)
@@ -268,6 +283,7 @@ private fun control(theme: Theme, height: Int, icon: String, row: Int, explanati
                         8 + 18 * 8 - 2,
                         18 + 18 * row - 2,
                         imageHeight = height,
+                        tint = ACCENT,
                     )
                 )
                 .append(explanation)

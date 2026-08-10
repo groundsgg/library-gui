@@ -21,8 +21,21 @@ internal const val GLYPHS: String = "ascii"
 /** Supporting text on the card: present, clearly not the headline. */
 internal const val DIM: String = "dim"
 
-/** The price, so a number that costs something reads like one. */
+/**
+ * The price bands.
+ *
+ * A number alone makes the grid something to read item by item; a colour makes the cheap and the
+ * ruinous separable at a glance. Four names rather than four sprite families, which is the whole
+ * point of the payload byte.
+ */
 internal const val GOLD: String = "gold"
+
+internal const val STANDARD: String = "standard"
+
+internal const val PREMIUM: String = "premium"
+
+/** The outline colour, so the theme's accent lives here instead of inside ten PNGs. */
+internal const val ACCENT: String = "accent"
 
 /**
  * Codepoint to pen advance, read back from what the generator measured.
@@ -155,7 +168,10 @@ object DemoTheme {
             // One frame per drawable character, so text can be composed at runtime. A codepoint
             // with an advance but no PNG is a blank — the space — and gets no frame on purpose.
             colour(DIM, 0x969AA4)
+            colour(STANDARD, 0xE6E6E6)
             colour(GOLD, 0xFFC24A)
+            colour(PREMIUM, 0xFF7A45)
+            colour(ACCENT, 0x2F7FD6)
             glyphs(GLYPHS, "glyph_", GLYPH_ADVANCES)
             GLYPH_ADVANCES.keys
                 .filter { code -> ART.resolve("frame/glyph_$code.png").exists() }

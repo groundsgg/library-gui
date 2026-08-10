@@ -594,6 +594,31 @@ def group_frame(c, col0, row0, col1, row1):
 TOOLBAR_ICONS = ["arrow_left", "search", "plus", "minus", "refresh", "lock_closed", "settings"]
 
 
+def contour(icon, path):
+    """The ring of empty pixels touching an icon's artwork, drawn white so it can be tinted.
+
+    Dilating the alpha mask and subtracting the mask leaves exactly the pixels that touch the
+    shape, so the outline follows the silhouette rather than boxing it. Two radii at two alphas
+    give a bright core and a softer halo; the hue arrives at runtime from the theme's palette,
+    which is why nothing here is coloured. Written once — this loop used to exist twice, wearing
+    two hardcoded blues.
+
+    A 20x20 canvas with the icon at (2, 2) keeps the outer ring off the edge: `refresh` reaches to
+    within one pixel of its own bounds, so anything tighter clips its halo.
+    """
+    w, h, px = icon
+    mask = {(x + 2, y + 2) for y in range(h) for x in range(w) if px[y * w + x][3]}
+    ring = Canvas(20, 20)
+    for radius, alpha in ((2, 110), (1, 255)):
+        for mx, my in mask:
+            for dy in range(-radius, radius + 1):
+                for dx in range(-radius, radius + 1):
+                    at = (mx + dx, my + dy)
+                    if at not in mask and 0 <= at[0] < 20 and 0 <= at[1] < 20:
+                        ring.set(at[0], at[1], (255, 255, 255, alpha))
+    ring.write(path)
+
+
 def blit(canvas, sprite, x, y):
     w, h, px = sprite
     for dy in range(h):
@@ -671,17 +696,7 @@ def overview():
     # A 20x20 canvas with the icon at (2, 2) is what keeps the outer ring off the edge: `refresh`
     # reaches to within one pixel of its own bounds, so anything tighter clips its halo.
     for name in TOOLBAR_ICONS:
-        w, h, px = load_rgba(f"gicon_{name}")
-        mask = {(x + 2, y + 2) for y in range(h) for x in range(w) if px[y * w + x][3]}
-        ring = Canvas(20, 20)
-        for radius, colour in ((2, (87, 214, 236, 110)), (1, (27, 95, 190, 255))):
-            for x, y in mask:
-                for dy in range(-radius, radius + 1):
-                    for dx in range(-radius, radius + 1):
-                        at = (x + dx, y + dy)
-                        if at not in mask and 0 <= at[0] < 20 and 0 <= at[1] < 20:
-                            ring.set(at[0], at[1], colour)
-        ring.write(HERE / "frame" / f"ov_outline_{name}.png")
+        contour(load_rgba(f"gicon_{name}"), HERE / "frame" / f"ov_outline_{name}.png")
 
     # Each icon again, for redrawing over the cover.
     for name in TOOLBAR_ICONS:
@@ -807,17 +822,7 @@ def market():
         patch.write(HERE / "frame" / f"mk_cover_{slot}.png")
 
     for name, _ in MARKET_CONTROLS:
-        w_, h_, px = load_rgba(f"gicon_{name}")
-        mask = {(gx + 2, gy + 2) for gy in range(h_) for gx in range(w_) if px[gy * w_ + gx][3]}
-        ring = Canvas(20, 20)
-        for radius, colour in ((2, (87, 214, 236, 110)), (1, (27, 95, 190, 255))):
-            for mx, my in mask:
-                for dy in range(-radius, radius + 1):
-                    for dx in range(-radius, radius + 1):
-                        at = (mx + dx, my + dy)
-                        if at not in mask and 0 <= at[0] < 20 and 0 <= at[1] < 20:
-                            ring.set(at[0], at[1], colour)
-        ring.write(HERE / "frame" / f"market_outline_{name}.png")
+        contour(load_rgba(f"gicon_{name}"), HERE / "frame" / f"market_outline_{name}.png")
 
 
 def storybook():
