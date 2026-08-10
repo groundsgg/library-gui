@@ -19,3 +19,5 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
+include("examples:theme-demo")

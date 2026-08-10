@@ -3,3 +3,9 @@
 build/
 out/
 *.iml
+
+# Raw asset dumps. Not checked in: art/vanilla holds verbatim pixels from the Minecraft
+# client and from the grounds icon set, neither of which this repository may redistribute.
+# examples/theme-demo/art/README.md says how to recreate them.
+__pycache__/
+examples/theme-demo/art/vanilla/
