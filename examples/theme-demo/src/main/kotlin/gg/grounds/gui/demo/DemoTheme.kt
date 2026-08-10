@@ -225,6 +225,7 @@ object DemoTheme {
             }
             MARKET_CONTROLS.forEach { (icon, _) ->
                 frame("market_outline_$icon", "frame/market_outline_$icon.png")
+                frame("market_icon_$icon", "frame/market_icon_$icon.png")
             }
             ART.resolve("frame").toFile().list { _, n -> n.startsWith("market_item_") }
                 ?.sorted()

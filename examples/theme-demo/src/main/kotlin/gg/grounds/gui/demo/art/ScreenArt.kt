@@ -30,13 +30,18 @@ private const val WELL_RIM = 0xFF4E4E4E.toInt()
 val TOOLBAR_ICONS: List<String> =
     listOf("arrow_left", "search", "plus", "minus", "refresh", "lock_closed", "settings")
 
-val MARKET_CONTROL_ICONS: List<String> = listOf("search", "close", "question")
+/** Search, and the two that turn the page. Three icons for three rows of the spare column. */
+val MARKET_CONTROL_ICONS: List<String> = listOf("search", "arrow_left", "arrow_right")
 
 val MARKET_ITEMS: List<String> =
     listOf(
         "diamond_sword", "diamond_pickaxe", "diamond_axe", "iron_sword", "iron_pickaxe", "bow",
         "arrow", "golden_apple", "apple", "bread", "cooked_beef", "ender_pearl", "elytra", "saddle",
         "name_tag", "emerald", "diamond", "book", "paper", "feather", "stick",
+        "gold_ingot", "iron_ingot", "coal", "redstone", "lapis_lazuli", "quartz", "amethyst_shard",
+        "copper_ingot", "flint", "clay_ball", "brick", "leather", "slime_ball", "honeycomb",
+        "blaze_rod", "ghast_tear", "magma_cream", "nether_star", "phantom_membrane",
+        "prismarine_shard", "nautilus_shell", "echo_shard", "rabbit_hide", "prismarine_crystals",
     )
 
 private fun BufferedImage.centredText(sheet: BufferedImage, text: String, y: Int) {
@@ -262,9 +267,12 @@ fun paintMarket(dumps: Path, out: Path) {
     }
 
     MARKET_CONTROL_ICONS.forEach { name ->
-        loadDump(dumps, "gicon_$name")
-            .contour()
-            .writeSprite(out.resolve("frame/market_outline_$name.png"))
+        val icon = loadDump(dumps, "gicon_$name")
+        icon.contour().writeSprite(out.resolve("frame/market_outline_$name.png"))
+        // The icon on its own, because a control's hover blanks the slot before drawing its
+        // outline — and blanking takes the icon painted into the panel with it.
+        canvas(16, 16).also { it.blit(icon, 0, 0) }
+            .writeSprite(out.resolve("frame/market_icon_$name.png"))
     }
 }
 
