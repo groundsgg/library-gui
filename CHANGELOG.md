@@ -1,6 +1,11 @@
 # Changelog
 
-## [0.4.1](https://github.com/groundsgg/library-gui/compare/v0.4.0...v0.4.1) (2026-08-10)
+## [0.5.0](https://github.com/groundsgg/library-gui/compare/v0.4.0...v0.5.0) (2026-08-10)
+
+
+### Features
+
+* **pack:** let a theme say what it takes from the client ([#22](https://github.com/groundsgg/library-gui/issues/22)) ([78e89e0](https://github.com/groundsgg/library-gui/commit/78e89e0429cd6aff47826d92373e761c92d23824))
 
 
 ### Performance Improvements
