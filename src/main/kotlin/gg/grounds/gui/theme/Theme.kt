@@ -1,8 +1,10 @@
 package gg.grounds.gui.theme
 
 /**
- * Vanilla draws a container's title 8px right of the window's left edge, so a panel that should
- * start at that edge shifts back by 8.
+ * Vanilla draws an ordinary container's title 8px right of the window's left edge.
+ *
+ * Kept for callers that want the number itself; a panel no longer carries it, because it is not the
+ * same on every screen — see [TitleAnchor].
  */
 const val TITLE_INSET: Int = -8
 
@@ -12,6 +14,24 @@ const val TITLE_INSET: Int = -8
  * readable as "pixels below the title".
  */
 const val TITLE_ASCENT: Int = 7
+
+/** Row the title text's own top edge sits on, from the client's `titleLabelY`. */
+const val TITLE_TOP_Y: Int = 6
+
+/**
+ * Where the title's baseline falls inside the window — the number a panel's ascent is measured
+ * against, and the one worth naming, because a panel aligned with the window's top edge is declared
+ * at exactly this ascent.
+ */
+const val TITLE_BASELINE_Y: Int = TITLE_TOP_Y + TITLE_ASCENT
+
+/**
+ * Default vertical offset: lifts a panel's top edge to the window's own top edge.
+ *
+ * Zero would put the artwork six pixels lower, level with the title text instead of the window —
+ * which is the one placement nobody actually wants, so it is not the default.
+ */
+const val DEFAULT_PANEL_OFFSET_Y: Int = -TITLE_TOP_Y
 
 private val RESOURCE_ID = Regex("[a-z0-9_.-]+")
 
@@ -70,8 +90,24 @@ const val LAST_PRE_MINOR_FORMAT: Int = 64
  */
 const val FRAME_GLYPH_BASE: Int = 0xF000
 
-/** First codepoint of the spaces that cancel each corner's advance. */
-const val FRAME_SPACE_BASE: Int = 0xF010
+/**
+ * First codepoint of the spaces that cancel each frame's advance.
+ *
+ * The gap to [FRAME_GLYPH_BASE] is the number of frames a theme can hold, and it has to be a gap
+ * rather than a convention: a frame and its cancelling space are numbered from the same index, so
+ * the moment the two blocks touch, frame *n* is written with the codepoint of space *0*. Both
+ * providers then claim it, the later one in the font wins, and the marker silently renders as a
+ * space — the frame simply never appears, with nothing logged anywhere.
+ */
+const val FRAME_SPACE_BASE: Int = 0xF400
+
+/**
+ * How many frames a theme can hold, from the distance between the two blocks.
+ *
+ * Both blocks stay inside the private use area (0xE000–0xF8FF), which is what keeps them off every
+ * codepoint a player could type.
+ */
+const val FRAME_CAPACITY: Int = FRAME_SPACE_BASE - FRAME_GLYPH_BASE
 
 /**
  * Red channel that marks a glyph for relocation by the shader.
@@ -92,8 +128,9 @@ const val FRAME_MARKER_RED: Int = 0xFE
  * [width] and [height] are the source PNG's pixel size; the generator fails the build if the file
  * on disk disagrees, so this declaration can never silently drift from the artwork.
  *
- * @param offsetX horizontal shift from the title's own origin. The default puts the image at the
- *   window's left edge.
+ * @param offsetX extra horizontal nudge from wherever the screen puts its title. Zero is right for
+ *   almost everything — the screen's own inset is supplied by the [TitleAnchor] passed to
+ *   [Theme.title], not hardcoded here.
  * @param offsetY pixels *down* from the title text's top row; negative moves up.
  * @param advance width the glyph consumes before the label is drawn. Defaults to the drawn width
  *   plus the vanilla 1px gap. Override it if the client trims fully transparent columns off the
@@ -106,8 +143,8 @@ data class Panel(
     val width: Int,
     val height: Int,
     val scale: Int = 1,
-    val offsetX: Int = TITLE_INSET,
-    val offsetY: Int = 0,
+    val offsetX: Int = 0,
+    val offsetY: Int = DEFAULT_PANEL_OFFSET_Y,
     val advance: Int? = null,
 ) {
     init {
@@ -144,9 +181,12 @@ data class Panel(
     val drawnHeight: Int
         get() = height * scale
 
-    /** Font ascent that realises [offsetY]. */
+    /**
+     * Font ascent that realises [offsetY], measured from the title's baseline down to where the
+     * artwork's top edge should land.
+     */
     val ascent: Int
-        get() = TITLE_ASCENT - offsetY
+        get() = TITLE_BASELINE_Y - (TITLE_TOP_Y + offsetY)
 
     /** [advance] if set, else the drawn width plus the vanilla 1px inter-glyph gap. */
     val effectiveAdvance: Int
@@ -158,11 +198,15 @@ data class Panel(
  * through the `item_model` component. This replaces the item's whole appearance, so the underlying
  * material only decides stack behaviour, never what the player sees.
  */
-data class Icon(val id: String, val texture: String) {
+data class Icon(val id: String, val texture: String?) {
     init {
         requireId(id, "icon id")
-        requireTexture(texture)
+        texture?.let(::requireTexture)
     }
+
+    /** An icon with no artwork at all — the client is told to draw nothing. */
+    val empty: Boolean
+        get() = texture == null
 }
 
 /**
@@ -246,6 +290,7 @@ data class Theme(
     val icons: List<Icon> = emptyList(),
     val tooltips: List<Tooltip> = emptyList(),
     val slotHighlight: SlotHighlight? = null,
+    val bundleFiller: Boolean = false,
     val frames: List<Frame> = emptyList(),
 ) {
     private val glyphs: Map<String, String>
@@ -257,6 +302,14 @@ data class Theme(
         requireDistinct(panels.map { it.id }, "panel")
         requireDistinct(icons.map { it.id }, "icon")
         requireDistinct(tooltips.map { it.id }, "tooltip")
+        requireDistinct(frames.map { it.id }, "frame")
+        // Past this the frame block runs into the space block that cancels its advance, and every
+        // frame from there on renders as a space instead of as artwork. Nothing about that failure
+        // is visible — no log line, no missing file, just a hover that draws nothing — so it has to
+        // be caught here rather than discovered in a screenshot.
+        require(frames.size <= FRAME_CAPACITY) {
+            "${frames.size} frames exceed the $FRAME_CAPACITY a theme can carry"
+        }
         panelsById = panels.associateBy { it.id }
 
         // Sorted, so a glyph keeps its codepoint no matter what order the panels were declared in.
@@ -321,8 +374,8 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
         width: Int,
         height: Int,
         scale: Int = 1,
-        offsetX: Int = TITLE_INSET,
-        offsetY: Int = 0,
+        offsetX: Int = 0,
+        offsetY: Int = DEFAULT_PANEL_OFFSET_Y,
         advance: Int? = null,
     ) {
         panels += Panel(id, texture, width, height, scale, offsetX, offsetY, advance)
@@ -331,6 +384,18 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
     /** Declares a custom item graphic; see [Icon]. */
     fun icon(id: String, texture: String) {
         icons += Icon(id, texture)
+    }
+
+    /**
+     * Declares an item model that renders nothing.
+     *
+     * For the invisible items a themed screen is full of — the ones that exist only so a slot has
+     * something to hang a tooltip on. A fully transparent texture would also disappear, but it
+     * still costs an atlas entry and a blended quad per slot; `minecraft:empty` resolves to a model
+     * whose whole job is to produce no geometry.
+     */
+    fun emptyIcon(id: String) {
+        icons += Icon(id, null)
     }
 
     /** Declares a tooltip skin — the per-item hover effect; see [Tooltip]. */
@@ -347,6 +412,31 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
     }
 
     private var highlight: SlotHighlight? = null
+
+    /**
+     * Makes an empty bundle usable as an invisible marker carrier.
+     *
+     * Worth the oddity for one reason: a bundle's tooltip is the only one the client keeps drawing
+     * while the cursor carries a stack. `BundleItem.getTooltipImage` checks only that the contents
+     * component is *present*, and every bundle has an empty one by default, so a bare bundle
+     * already qualifies — and `ClientBundleTooltip` is the sole class in the client whose
+     * `showTooltipWithItemInHand()` returns true. Markers riding in it therefore survive a click
+     * elsewhere on the screen, where any other item's markers blink out.
+     *
+     * An empty bundle's tooltip draws a progress bar and two strings of its own, so this blanks
+     * both: the two sprites and the two language keys. Those overrides are global, but they reach
+     * only real bundles — the sprite paths live under `container/bundle/` and are referenced from
+     * exactly one class.
+     *
+     * It does not survive being picked up itself: a left click with an empty cursor takes the
+     * bundle out of the slot, and a slot with no item has no tooltip at all. A right click is
+     * absorbed and does not.
+     */
+    fun bundleFiller() {
+        bundles = true
+    }
+
+    private var bundles = false
 
     /**
      * Ships the core-shader hover frame — the one hover effect that can be limited to a region of a
@@ -371,6 +461,7 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
             icons.toList(),
             tooltips.toList(),
             highlight,
+            bundles,
             frames.toList(),
         )
 }

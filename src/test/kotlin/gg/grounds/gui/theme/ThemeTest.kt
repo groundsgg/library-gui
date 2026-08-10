@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class ThemeTest {
     private val format = PackFormat(88)
@@ -28,9 +29,11 @@ class ThemeTest {
 
     @Test
     fun `offsetY reads as pixels below the title and drives the ascent`() {
-        val panel = Panel("shop", "shop.png", 176, 166, offsetY = -6)
-        assertEquals(TITLE_ASCENT + 6, panel.ascent)
-        assertEquals(TITLE_ASCENT, Panel("shop", "shop.png", 176, 166).ascent)
+        // The default lifts the artwork to the window's top edge, which is ascent 13 — the value
+        // every other implementation of this technique also lands on.
+        assertEquals(TITLE_BASELINE_Y, Panel("shop", "shop.png", 176, 166).ascent)
+        // Level with the title text instead of the window: six pixels lower, six less ascent.
+        assertEquals(TITLE_ASCENT, Panel("shop", "shop.png", 176, 166, offsetY = 0).ascent)
     }
 
     @Test
@@ -83,6 +86,38 @@ class ThemeTest {
     fun `a pack format outside its own supported range fails`() {
         assertFailsWith<IllegalArgumentException> {
             PackFormat(88, minInclusive = 90, maxInclusive = 92)
+        }
+    }
+
+    @Test
+    fun `a frame never shares a codepoint with the space that cancels it`() {
+        // The two blocks are numbered from the same index, so a frame is only distinguishable from
+        // a cancelling space by the distance between the bases. Where they meet, both providers
+        // claim the codepoint, the font's later entry wins, and the marker draws a space instead of
+        // its artwork — invisibly, which is the whole reason this is asserted rather than trusted.
+        assertTrue(FRAME_CAPACITY > 0, "the frame block must not run into the space block")
+        assertEquals(FRAME_SPACE_BASE, FRAME_GLYPH_BASE + FRAME_CAPACITY)
+        assertTrue(
+            FRAME_SPACE_BASE + FRAME_CAPACITY - 1 <= Spaces.PUA_END,
+            "both blocks have to stay inside the private use area",
+        )
+    }
+
+    @Test
+    fun `more frames than the block can number is refused`() {
+        val ids = (0..FRAME_CAPACITY).map { "frame_$it" }
+        assertFailsWith<IllegalArgumentException> {
+            theme("grounds", format) { ids.forEach { id -> frame(id, "$id.png") } }
+        }
+    }
+
+    @Test
+    fun `two frames under one id are refused`() {
+        assertFailsWith<IllegalArgumentException> {
+            theme("grounds", format) {
+                frame("outline", "a.png")
+                frame("outline", "b.png")
+            }
         }
     }
 }

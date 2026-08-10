@@ -64,31 +64,46 @@ fun writePack(theme: Theme, assets: Path, out: Path) {
         }
     }
 
-    theme.icons.forEach { icon ->
-        install(assets, icon.texture, root / "textures" / "item" / "${icon.id}.png")
-        val model = "${theme.namespace}:item/${icon.id}"
-        write(
-            root / "models" / "item" / "${icon.id}.json",
-            Json.obj(
-                "parent" to Json.string("minecraft:item/generated"),
-                "textures" to Json.obj("layer0" to Json.string(model)),
-            ),
-        )
-        // The item model *definition* is what the item_model component resolves against; the model
-        // above is what it points at.
-        write(
-            root / "items" / "${icon.id}.json",
-            Json.obj(
-                "model" to
-                    Json.obj(
-                        "type" to Json.string("minecraft:model"),
-                        "model" to Json.string(model),
-                    )
-            ),
-        )
-    }
+    theme.icons
+        .filter { it.empty }
+        .forEach { icon ->
+            // No texture, no model — the client is told there is nothing to draw at all.
+            write(
+                root / "items" / "${icon.id}.json",
+                Json.obj("model" to Json.obj("type" to Json.string("minecraft:empty"))),
+            )
+        }
+
+    theme.icons
+        .filterNot { it.empty }
+        .forEach { icon ->
+            install(assets, icon.texture!!, root / "textures" / "item" / "${icon.id}.png")
+            val model = "${theme.namespace}:item/${icon.id}"
+            write(
+                root / "models" / "item" / "${icon.id}.json",
+                Json.obj(
+                    "parent" to Json.string("minecraft:item/generated"),
+                    "textures" to Json.obj("layer0" to Json.string(model)),
+                ),
+            )
+            // The item model *definition* is what the item_model component resolves against; the
+            // model
+            // above is what it points at.
+            write(
+                root / "items" / "${icon.id}.json",
+                Json.obj(
+                    "model" to
+                        Json.obj(
+                            "type" to Json.string("minecraft:model"),
+                            "model" to Json.string(model),
+                        )
+                ),
+            )
+        }
 
     if (theme.frames.isNotEmpty()) writeHoverFrames(theme, assets, out, root)
+
+    if (theme.bundleFiller) writeBundleBlanks(out)
 
     theme.slotHighlight?.let { highlight ->
         // Deliberately not under the theme's namespace: this replaces a vanilla sprite, which is
@@ -169,6 +184,51 @@ fun zipPack(packDir: Path, archive: Path): String {
         }
     }
     return sha1(archive)
+}
+
+/**
+ * Blanks what an empty bundle's tooltip draws of its own accord.
+ *
+ * A bundle is the only carrier whose tooltip survives a carried stack, which is why a themed screen
+ * might want one — but its tooltip paints a progress bar and says "Empty" underneath whatever the
+ * theme put there. Both are silenced here: two transparent sprites and two blank language keys.
+ *
+ * Global, but narrowly so. The sprite paths sit under `container/bundle/` and are referenced from a
+ * single client class, and the language keys belong to bundles alone. Nothing else changes.
+ */
+private fun writeBundleBlanks(out: Path) {
+    val sprites =
+        out / "assets" / "minecraft" / "textures" / "gui" / "sprites" / "container" / "bundle"
+    sprites.createDirectories()
+    listOf("bundle_progressbar_border" to 12, "bundle_progressbar_fill" to 6).forEach { (name, size)
+        ->
+        val blank = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        (sprites / "$name.png").outputStream().buffered().use { ImageIO.write(blank, "png", it) }
+        // The client nine-slices these, so the metadata has to survive the blanking too.
+        write(
+            Path.of("${sprites / "$name.png"}.mcmeta"),
+            Json.obj(
+                "gui" to
+                    Json.obj(
+                        "scaling" to
+                            Json.obj(
+                                "type" to Json.string("nine_slice"),
+                                "width" to Json.number(size),
+                                "height" to Json.number(size),
+                                "border" to Json.number(2),
+                            )
+                    )
+            ),
+        )
+    }
+    // Language files merge per key, so this replaces exactly these two strings and nothing else.
+    write(
+        out / "assets" / "minecraft" / "lang" / "en_us.json",
+        Json.obj(
+            "item.minecraft.bundle.empty" to Json.string(""),
+            "item.minecraft.bundle.empty.description" to Json.string(""),
+        ),
+    )
 }
 
 /** The DOS timestamp Gradle also stamps into reproducible archives. */

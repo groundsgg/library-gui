@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.TextComponent
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.ShadowColor
 
 class ThemeTitleTest {
@@ -38,6 +39,9 @@ class ThemeTitleTest {
         val glyphs = subject.title("shop").children()[0]
         assertEquals(Key.key("grounds", "gui"), glyphs.style().font())
         assertEquals(ShadowColor.none(), glyphs.style().shadowColor())
+        // Vanilla's container title colour is 0x404040 and the shader multiplies the glyph's
+        // texture by it, so anything but an explicit white renders the artwork dark.
+        assertEquals(NamedTextColor.WHITE, glyphs.style().color())
     }
 
     @Test
