@@ -267,9 +267,12 @@ fun paintMarket(dumps: Path, out: Path) {
     }
 
     MARKET_CONTROL_ICONS.forEach { name ->
-        loadDump(dumps, "gicon_$name")
-            .contour()
-            .writeSprite(out.resolve("frame/market_outline_$name.png"))
+        val icon = loadDump(dumps, "gicon_$name")
+        icon.contour().writeSprite(out.resolve("frame/market_outline_$name.png"))
+        // The icon on its own, because a control's hover blanks the slot before drawing its
+        // outline — and blanking takes the icon painted into the panel with it.
+        canvas(16, 16).also { it.blit(icon, 0, 0) }
+            .writeSprite(out.resolve("frame/market_icon_$name.png"))
     }
 }
 

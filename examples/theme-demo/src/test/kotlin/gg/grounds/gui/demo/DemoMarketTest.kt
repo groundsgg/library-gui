@@ -19,7 +19,11 @@ class DemoMarketTest {
     fun `every frame the market composes is declared`() {
         val theme = DemoTheme.current()
         val ids =
-            MARKET_CONTROLS.map { (icon, _) -> "market_outline_$icon" } +
+            MARKET_CONTROLS.flatMap { (icon, _) ->
+                // Both, because a control's hover blanks its slot and has to put the icon back —
+                // and a missing redraw is a control that disappears while you point at it.
+                listOf("market_outline_$icon", "market_icon_$icon")
+            } +
                 MARKET_TEXTURES.map { texture -> "market_item_$texture" } +
                 MARKET_CARD_PARTS.map { part -> "market_$part" } +
                 (0 until 54).map { slot -> "mk_cover_$slot" }

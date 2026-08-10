@@ -7,6 +7,8 @@ import gg.grounds.gui.theme.Theme
 import gg.grounds.gui.theme.chestAnchor
 import gg.grounds.gui.theme.containerHeight
 import gg.grounds.gui.layout.Rect
+import gg.grounds.gui.layout.slotItemX
+import gg.grounds.gui.layout.slotItemY
 import gg.grounds.gui.theme.frameMarker
 import gg.grounds.gui.theme.meterMarker
 import gg.grounds.gui.theme.text
@@ -389,7 +391,7 @@ private fun Gui.controls(
         )
     MARKET_CONTROLS.forEachIndexed { row, (icon, slot) ->
         val (title, note) = cards[row]
-        place(slot, control(theme, height, icon, row, cardOf(theme, height, title, note), tint))
+        place(slot, control(theme, height, icon, slot, cardOf(theme, height, title, note), tint))
     }
 }
 
@@ -397,24 +399,53 @@ private fun Gui.controls(
  * A control in the spare column: the icon is painted into the panel, the hover traces its contour
  * and writes its own explanation into the card.
  */
+/**
+ * A control in the spare column, in the three layers every icon-as-button needs.
+ *
+ * The cover is the one that was missing, and its absence showed twice over. Vanilla draws its own
+ * hover box before any tooltip, so without a patch to blank it the box sat under the contour. And
+ * because these controls are re-sent every tick to animate, there is a frame in each step where the
+ * client has rebuilt the tooltip and not yet drawn its markers — in that frame the box was all
+ * there was, so it pulsed along with the outline.
+ *
+ * The cover blanks the icon painted into the panel as well, which is why the icon is drawn again on
+ * top. Same order as the overview's toolbar: blank, outline, icon.
+ */
 private fun control(
     theme: Theme,
     height: Int,
     icon: String,
-    row: Int,
+    slot: Int,
     explanation: Component,
     tint: String = ACCENT,
 ) =
     item(Material.BUNDLE) {
+        val row = slot / 9
         name(
             Component.empty()
                 .append(
                     theme.frameMarker(
+                        "mk_cover_$slot",
+                        slotItemX(slot % 9),
+                        slotItemY(row),
+                        imageHeight = height,
+                    )
+                )
+                .append(
+                    theme.frameMarker(
                         "market_outline_$icon",
-                        8 + 18 * 8 - 2,
-                        18 + 18 * row - 2,
+                        slotItemX(8) - 2,
+                        slotItemY(row) - 2,
                         imageHeight = height,
                         tint = tint,
+                    )
+                )
+                .append(
+                    theme.frameMarker(
+                        "market_icon_$icon",
+                        slotItemX(8),
+                        slotItemY(row),
+                        imageHeight = height,
                     )
                 )
                 .append(explanation)
