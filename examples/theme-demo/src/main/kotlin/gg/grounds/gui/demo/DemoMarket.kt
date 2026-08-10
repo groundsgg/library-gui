@@ -20,53 +20,74 @@ import net.minestom.server.item.Material
 private const val ROWS = 6
 private val CLICK = Sound.sound(Key.key("ui.button.click"), Sound.Source.MASTER, 0.4f, 1f)
 
-/** The card the generator sunk into the panel, and the interior a hover writes into. */
-private const val CARD_X = 8
-private const val CARD_Y = 68
-private const val CARD_W = 160
-private const val CARD_INNER_X = CARD_X + 3
-private const val CARD_INNER_Y = CARD_Y + 3
+/**
+ * The card's geometry, matching what the generator drew.
+ *
+ * Every one of these is a pixel in the panel too, which is the awkward part of painting a layout
+ * into artwork: the numbers exist twice, in Python and here, and they have to agree. What keeps
+ * them honest is that a disagreement is instantly visible — text lands off its own rule.
+ */
+private const val CARD_INNER_X = 10
+private const val CARD_INNER_Y = 79
+private const val PREVIEW_WELL_X = 11
+private const val PREVIEW_WELL_Y = 83
+private const val PREVIEW_X = PREVIEW_WELL_X + 2
+private const val PREVIEW_Y = PREVIEW_WELL_Y + 2
+private const val TEXT_X = 54
+private const val TEXT_RIGHT = 163
 
-/** Four lines fit; twelve pixels apart is vanilla's own line height plus breathing room. */
-private const val LINE_HEIGHT = 12
+private const val NAME_Y = 83
+private const val RULE_Y = 94
+private const val NOTE_Y = 98
+private const val COIN_Y = 105
+private const val PRICE_X = TEXT_X + 17
+private const val PRICE_Y = 109
 
-private val GRID_SLOTS: List<Int> = (0..2).flatMap { row -> (1..7).map { col -> row * 9 + col } }
+/** Eight columns wide, so the grid ends on the same margins as the card under it. */
+private val GRID_SLOTS: List<Int> = (0..2).flatMap { row -> (0..7).map { col -> row * 9 + col } }
 private const val SEARCH_SLOT = 8
 private const val CLEAR_SLOT = 17
+private const val HELP_SLOT = 26
 
+/**
+ * One row of the shop.
+ *
+ * [texture] is the name of the item's own client texture, which is also the id of the preview frame
+ * cut from it. Only items whose icon is a flat texture are in here: a block is rendered from a 3D
+ * model in the GUI, and there is no single image to enlarge.
+ */
 private class Offer(
     val material: Material,
+    val texture: String,
     val name: String,
     val price: Int,
     val note: String,
 )
 
-/** Deliberately more than fits, so the search has something to narrow down. */
+/** Twenty-one offers in a twenty-four slot grid, so the trailing tiles show the empty state too. */
 private val CATALOGUE =
     listOf(
-        Offer(Material.DIAMOND_SWORD, "Diamond Sword", 240, "Sharpness III"),
-        Offer(Material.DIAMOND_PICKAXE, "Diamond Pickaxe", 220, "Efficiency IV"),
-        Offer(Material.DIAMOND_AXE, "Diamond Axe", 210, "Unbreaking II"),
-        Offer(Material.IRON_SWORD, "Iron Sword", 60, "Plain steel"),
-        Offer(Material.IRON_PICKAXE, "Iron Pickaxe", 55, "Plain steel"),
-        Offer(Material.BOW, "Bow", 90, "Power II"),
-        Offer(Material.ARROW, "Arrow", 2, "Sold in stacks"),
-        Offer(Material.GOLDEN_APPLE, "Golden Apple", 120, "Absorption"),
-        Offer(Material.COOKED_BEEF, "Cooked Beef", 8, "Restores 8"),
-        Offer(Material.BREAD, "Bread", 3, "Restores 5"),
-        Offer(Material.OAK_LOG, "Oak Log", 4, "Building block"),
-        Offer(Material.STONE, "Stone", 2, "Building block"),
-        Offer(Material.GLASS, "Glass", 6, "Building block"),
-        Offer(Material.TORCH, "Torch", 1, "Light level 14"),
-        Offer(Material.ENDER_PEARL, "Ender Pearl", 150, "Throwable"),
-        Offer(Material.SHIELD, "Shield", 70, "Blocks melee"),
-        Offer(Material.ELYTRA, "Elytra", 900, "Requires fireworks"),
-        Offer(Material.TNT, "TNT", 45, "Handle with care"),
-        Offer(Material.LAVA_BUCKET, "Lava Bucket", 65, "One use"),
-        Offer(Material.SADDLE, "Saddle", 80, "For horses"),
-        Offer(Material.NAME_TAG, "Name Tag", 130, "Renames a mob"),
-        Offer(Material.EMERALD, "Emerald", 30, "Villager currency"),
-        Offer(Material.BOOK, "Book", 12, "For enchanting"),
+        Offer(Material.DIAMOND_SWORD, "diamond_sword", "Diamond Sword", 240, "Sharpness III"),
+        Offer(Material.DIAMOND_PICKAXE, "diamond_pickaxe", "Diamond Pickaxe", 220, "Efficiency IV"),
+        Offer(Material.DIAMOND_AXE, "diamond_axe", "Diamond Axe", 210, "Unbreaking II"),
+        Offer(Material.IRON_SWORD, "iron_sword", "Iron Sword", 60, "No enchantments"),
+        Offer(Material.IRON_PICKAXE, "iron_pickaxe", "Iron Pickaxe", 55, "No enchantments"),
+        Offer(Material.BOW, "bow", "Bow", 90, "Power II"),
+        Offer(Material.ARROW, "arrow", "Arrow", 2, "Sold by the stack"),
+        Offer(Material.GOLDEN_APPLE, "golden_apple", "Golden Apple", 120, "Absorption for 2m"),
+        Offer(Material.APPLE, "apple", "Apple", 4, "Restores 4 hunger"),
+        Offer(Material.BREAD, "bread", "Bread", 3, "Restores 5 hunger"),
+        Offer(Material.COOKED_BEEF, "cooked_beef", "Cooked Beef", 8, "Restores 8 hunger"),
+        Offer(Material.ENDER_PEARL, "ender_pearl", "Ender Pearl", 150, "Throw to travel"),
+        Offer(Material.ELYTRA, "elytra", "Elytra", 900, "Fireworks sold apart"),
+        Offer(Material.SADDLE, "saddle", "Saddle", 80, "Fits most mounts"),
+        Offer(Material.NAME_TAG, "name_tag", "Name Tag", 130, "Renames one mob"),
+        Offer(Material.EMERALD, "emerald", "Emerald", 30, "Villager currency"),
+        Offer(Material.DIAMOND, "diamond", "Diamond", 90, "Crafting material"),
+        Offer(Material.BOOK, "book", "Book", 12, "For the enchanter"),
+        Offer(Material.PAPER, "paper", "Paper", 2, "For maps and books"),
+        Offer(Material.FEATHER, "feather", "Feather", 3, "For arrows"),
+        Offer(Material.STICK, "stick", "Stick", 1, "For everything else"),
     )
 
 /** What each player is currently filtering by. Empty means the whole catalogue. */
@@ -107,23 +128,28 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
 
     fun marker(id: String, x: Int, y: Int) = theme.frameMarker(id, x, y, imageHeight = height)
 
-    /** A line of the card, centred or left-aligned, drawn over the blanked interior. */
-    fun line(row: Int, body: String, centred: Boolean = false): Component {
-        val safe = renderable(body)
-        val x =
-            if (centred) CARD_X + (CARD_W - theme.textWidth(GLYPHS, safe)) / 2
-            else CARD_INNER_X + 3
-        return theme.text(GLYPHS, x, CARD_INNER_Y + 4 + row * LINE_HEIGHT, safe, imageHeight = height)
-    }
+    fun line(set: String, x: Int, y: Int, body: String) =
+        theme.text(set, x, y, theme.fit(set, body, TEXT_RIGHT - x), imageHeight = height)
 
     /**
-     * The card, written from scratch on every hover.
+     * The card, rewritten from scratch on every hover.
      *
-     * The blanking patch comes first because the panel already carries a resting hint, and markers
-     * draw in the order they are appended. Without it the two would overlap into mush.
+     * The blanking patch comes first and the preview well goes back on top of it, rather than the
+     * patch being shaped to spare the well: markers draw in the order they are appended, and one
+     * rectangle plus one redraw is far easier to keep correct than a patch with a hole in it.
      */
-    fun card(vararg lines: Component): Component =
-        lines.fold(marker("market_card", CARD_INNER_X, CARD_INNER_Y)) { acc, l -> acc.append(l) }
+    fun card(vararg parts: Component): Component =
+        parts.fold(
+            marker("market_card", CARD_INNER_X, CARD_INNER_Y)
+                .append(marker("market_well", PREVIEW_WELL_X, PREVIEW_WELL_Y))
+        ) { acc, part -> acc.append(part) }
+
+    /** A heading and a supporting line, the shape every card on this screen uses. */
+    fun heading(title: String, note: String) =
+        Component.empty()
+            .append(line(GLYPHS, TEXT_X, NAME_Y, title))
+            .append(marker("market_rule", TEXT_X, RULE_Y))
+            .append(line(GLYPHS_DIM, TEXT_X, NOTE_Y, note))
 
     gui(player, theme.title("market", Component.empty(), chestAnchor(ROWS)), rows = ROWS) {
         matches.take(GRID_SLOTS.size).forEachIndexed { index, offer ->
@@ -135,10 +161,10 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                     // the cursor on top of it would be the very thing this replaces.
                     name(
                         card(
-                            line(0, offer.name, centred = true),
-                            line(1, "Price  ${offer.price} coins"),
-                            line(2, offer.note),
-                            line(3, "Left click to buy"),
+                            marker("market_item_${offer.texture}", PREVIEW_X, PREVIEW_Y),
+                            heading(offer.name, offer.note),
+                            marker("market_coin", TEXT_X - 1, COIN_Y),
+                            line(GLYPHS, PRICE_X, PRICE_Y, offer.price.toString()),
                         )
                     )
                     tooltipStyle = theme.tooltipStyle(DemoTheme.BLANK)
@@ -157,7 +183,10 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
 
         // The search control. A container cannot read a keystroke, so the button hands off to a
         // dialog and the dialog hands back a string.
-        button(SEARCH_SLOT, control(theme, height, "search", card(line(0, "Search the catalogue", centred = true)))) {
+        button(
+            SEARCH_SLOT,
+            control(theme, height, "search", 0, card(heading("Search", "Type part of a name"))),
+        ) {
             onClick {
                 player.playSound(CLICK)
                 player.closeInventory()
@@ -165,17 +194,11 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
             }
         }
 
+        val filterNote =
+            if (query.isBlank()) "Nothing filtered" else "${matches.size} of ${CATALOGUE.size} shown"
         button(
             CLEAR_SLOT,
-            control(
-                theme,
-                height,
-                "close",
-                card(
-                    line(0, "Clear the filter", centred = true),
-                    line(1, if (query.isBlank()) "Nothing filtered" else "Showing ${matches.size} of ${CATALOGUE.size}"),
-                ),
-            ),
+            control(theme, height, "close", 1, card(heading("Clear", filterNote))),
         ) {
             onClick {
                 player.playSound(CLICK)
@@ -183,8 +206,26 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
             }
         }
 
+        button(
+            HELP_SLOT,
+            control(theme, height, "question", 2, card(heading("How this works", "Hover writes here"))),
+        ) {
+            onClick {
+                player.playSound(CLICK)
+                player.sendMessage(
+                    Component.text("The card is part of the window, not a tooltip: ", NamedTextColor.GRAY)
+                        .append(
+                            Component.text(
+                                "every line is drawn by markers the hovered item carries.",
+                                NamedTextColor.WHITE,
+                            )
+                        )
+                )
+            }
+        }
+
         // A filtered catalogue leaves holes in the grid; they behave like every other empty tile.
-        val used = GRID_SLOTS.take(matches.size) + listOf(SEARCH_SLOT, CLEAR_SLOT)
+        val used = GRID_SLOTS.take(matches.size) + listOf(SEARCH_SLOT, CLEAR_SLOT, HELP_SLOT)
         (0 until ROWS * 9).filterNot(used::contains).forEach { slot ->
             button(slot, blankTile(theme, height, slot)) {}
         }
@@ -196,7 +237,7 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
  * A control in the spare column: the icon is painted into the panel, the hover traces its contour
  * and writes its own explanation into the card.
  */
-private fun control(theme: Theme, height: Int, icon: String, explanation: Component) =
+private fun control(theme: Theme, height: Int, icon: String, row: Int, explanation: Component) =
     item(Material.BUNDLE) {
         name(
             Component.empty()
@@ -204,7 +245,7 @@ private fun control(theme: Theme, height: Int, icon: String, explanation: Compon
                     theme.frameMarker(
                         "market_outline_$icon",
                         8 + 18 * 8 - 2,
-                        18 + 18 * (if (icon == "search") 0 else 1) - 2,
+                        18 + 18 * row - 2,
                         imageHeight = height,
                     )
                 )
@@ -230,12 +271,18 @@ private fun blankTile(theme: Theme, height: Int, slot: Int) =
     }
 
 /**
- * Drops what the glyph set cannot draw.
+ * Trims a line to what the glyph set can draw, and to the width the card has for it.
  *
- * The set covers printable ASCII, and a player can type anything into the dialog. Rendering text is
- * the one place where failing loudly is wrong: the string is the player's, not the programmer's, and
- * an umlaut in a search box should narrow a list rather than throw an exception at whoever opened
- * the screen. Everything the server itself writes stays inside the set, so this only ever trims
- * input.
+ * Two different failures, both worth swallowing here. The set covers printable ASCII and a player
+ * can type anything into the dialog — rendering text is the one place where throwing is wrong,
+ * because the string belongs to the player and an umlaut in a search box should narrow a list
+ * rather than crash the screen it came from. And a line wider than the card would march out of it
+ * and, far enough out, past the signed byte a marker's position fits in.
  */
-private fun renderable(text: String): String = text.filter { it.code in 32..126 }
+private fun Theme.fit(set: String, body: String, available: Int): String {
+    var out = body.filter { it.code in 32..126 }
+    while (out.isNotEmpty() && textWidth(set, out) > available) {
+        out = out.dropLast(1)
+    }
+    return out
+}

@@ -262,6 +262,14 @@ GUI_SHADOW = (85, 85, 85, 255)      # 555555 — shadowed edge, bottom and right
 GUI_EDGE = (0, 0, 0, 255)           # 000000 — the 1px outline around everything
 WELL_DARK = (55, 55, 55, 255)       # 373737 — a slot's shadowed top-left
 WELL_FACE = (139, 139, 139, 255)    # 8B8B8B — a slot's interior
+TEXT_DIM = (150, 154, 164, 255)
+"""Secondary text on the dark card: present, clearly not the headline."""
+
+CARD_FILL = (59, 59, 59, 255)
+CARD_DARK = (31, 31, 31, 255)
+CARD_LIGHT = (110, 110, 110, 255)
+CARD_RULE = (86, 86, 86, 255)
+
 HOVER_TINT = 70
 """How far a hovered tile is lifted toward white, as an alpha out of 255."""
 
@@ -512,10 +520,14 @@ def glyph_frames():
         # so it draws where it always did, and the extra columns are transparent.
         width = max(max(x for x, _, _ in pixels) + 1, 4)
         height = max(y for _, y, _ in pixels) + 1
-        glyph = Canvas(width, height)
-        for gx, gy, _ in pixels:
-            glyph.set(gx, gy, WHITE)
-        glyph.write(HERE / "frame" / f"glyph_{code}.png")
+        # Two families, because a marker cannot be tinted at runtime — its colour channel carries
+        # the position payload, so the only colour a glyph will ever have is the one baked in. A
+        # card without a second weight has no hierarchy at all: everything shouts equally.
+        for prefix, colour in (("glyph_", WHITE), ("glyphdim_", TEXT_DIM)):
+            glyph = Canvas(width, height)
+            for gx, gy, _ in pixels:
+                glyph.set(gx, gy, colour)
+            glyph.write(HERE / "frame" / f"{prefix}{code}.png")
 
     table = HERE / "frame" / "glyphs.properties"
     table.write_text(
@@ -679,9 +691,44 @@ def overview():
         cv.write(HERE / "frame" / f"ov_icon_{name}.png")
 
 
-# The detail card: a sunken panel under the item grid, and the region a hover writes into.
-CARD = (8, 68, 160, 62)
+# The detail card. Tightened from the first cut, which ran to y=130 and crowded the "Inventory"
+# label, and was a flat slab the width of the window with one line of text lost in the middle of it.
+CARD = (7, 76, 162, 50)
 CARD_INNER = (CARD[0] + 3, CARD[1] + 3, CARD[2] - 6, CARD[3] - 6)
+
+# A slot-sized well for the preview, and the text column beside it.
+PREVIEW_WELL = (CARD[0] + 4, CARD[1] + 7, 36, 36)
+PREVIEW = (PREVIEW_WELL[0] + 2, PREVIEW_WELL[1] + 2)
+TEXT_X = PREVIEW_WELL[0] + PREVIEW_WELL[2] + 7
+TEXT_RIGHT = CARD[0] + CARD[2] - 6
+
+# Three controls for three grid rows: a two-high column left a notch beside the third row.
+MARKET_CONTROLS = [("search", 0), ("close", 1), ("question", 2)]
+
+MARKET_ITEMS = [
+    "diamond_sword", "diamond_pickaxe", "diamond_axe", "iron_sword", "iron_pickaxe", "bow",
+    "arrow", "golden_apple", "apple", "bread", "cooked_beef", "ender_pearl", "elytra", "saddle",
+    "name_tag", "emerald", "diamond", "book", "paper", "feather", "stick",
+]
+
+
+def scaled(sprite, factor):
+    """Nearest-neighbour upscale, which is the only kind pixel art survives."""
+    w, h, px = sprite
+    out = []
+    for y in range(h * factor):
+        for x in range(w * factor):
+            out.append(px[(y // factor) * w + (x // factor)])
+    return w * factor, h * factor, out
+
+
+def sunken(c, x, y, w, h, fill, dark, light):
+    """A recessed panel: shadow on the top and left, light on the bottom and right."""
+    c.rect(x, y, w, h, fill)
+    c.rect(x, y, w - 1, 1, dark)
+    c.rect(x, y, 1, h - 1, dark)
+    c.rect(x + 1, y + h - 1, w - 1, 1, light)
+    c.rect(x + w - 1, y + 1, 1, h - 1, light)
 
 
 def market():
@@ -689,46 +736,69 @@ def market():
 
     Vanilla puts an item's description in a tooltip that follows the mouse and is sized by its own
     text. A marker can put artwork anywhere in the window, so the description goes where the layout
-    wants it: a fixed card under the grid, the same place every time, with room for four lines.
+    wants it: a fixed card under the grid, the same place every time.
 
-    Everything written into that card is composed at runtime from the glyph frames, because none of
-    it is known when the pack is built — a price is a number the server holds.
+    The card is dark on purpose. It is the one region of this window that is a display rather than a
+    surface you click, and white text on vanilla's mid grey has barely any contrast — the first cut
+    was a grey slab with grey text in the middle of it and read as unfinished, because it was.
     """
     sheet = load_rgba("ascii")
     c = window(PANEL_W, OV_H)
 
-    # Item grid, seven wide.
+    # A title, where a container's own title would sit. The panel occupies the title glyph, so the
+    # words have to be painted rather than sent.
+    draw_text(c, sheet, "Market", 8, 6, (64, 64, 64, 255), shadow=False)
+
+    # Eight columns, not seven. Slot columns sit at a fixed 7 + 18c, so columns 0..8 span exactly
+    # 7..169 — the same margins the card uses. Insetting the grid by a column instead left it
+    # noticeably narrower than the card below it, with nothing to justify the difference.
     for row in range(3):
-        for col in range(1, 8):
+        for col in range(8):
             well(c, 7 + 18 * col, 17 + 18 * row)
-    group_frame(c, 1, 0, 7, 2)
+    group_frame(c, 0, 0, 7, 2)
 
-    # Two controls in the spare right-hand column: search, and clear.
-    for icon, row in (("search", 0), ("close", 1)):
+    # The two controls get a frame of their own, so they read as a pair belonging to the grid
+    # rather than as two icons adrift on the panel.
+    for icon, row in MARKET_CONTROLS:
         blit(c, load_rgba(f"gicon_{icon}"), 8 + 18 * 8, 18 + 18 * row)
+    group_frame(c, 8, 0, 8, 2)
 
-    # The card. Sunken, so it reads as a display rather than as something clickable.
     x, y, w, h = CARD
-    c.rect(x, y, w, h, WELL_FACE)
-    c.rect(x, y, w - 1, 1, WELL_DARK)
-    c.rect(x, y, 1, h - 1, WELL_DARK)
-    c.rect(x + 1, y + h - 1, w - 1, 1, WELL_LIGHT)
-    c.rect(x + w - 1, y + 1, 1, h - 1, WELL_LIGHT)
+    sunken(c, x, y, w, h, CARD_FILL, CARD_DARK, CARD_LIGHT)
+    sunken(c, *PREVIEW_WELL, CARD_DARK, (20, 20, 20, 255), (78, 78, 78, 255))
 
     hint = "Point at an item"
-    draw_text(c, sheet, hint, x + (w - text_width(sheet, hint)) // 2, y + h // 2 - 4,
-              (90, 90, 90, 255), shadow=False)
+    draw_text(c, sheet, hint, TEXT_X, y + h // 2 - 4, TEXT_DIM, shadow=False)
 
     player_wells(c, OV_H)
     c.write(HERE / "panels" / "market.png")
 
-    # One patch over the card's interior, to blank the resting hint before a hover writes over it.
-    # The interior is a single flat colour, so one sprite covers it however the text is laid out.
-    Canvas(CARD_INNER[2], CARD_INNER[3], WELL_FACE).write(HERE / "frame" / "market_card.png")
+    # The card's interior, flat, to blank everything before a hover rewrites it. The preview well
+    # goes back on top as its own frame rather than being spared by the patch: one rectangle is far
+    # simpler to reason about than a patch with a hole in it.
+    Canvas(CARD_INNER[2], CARD_INNER[3], CARD_FILL).write(HERE / "frame" / "market_card.png")
 
-    # A patch per slot, cut out of this panel. Same reasoning as the overview: what sits under an
-    # empty tile here is a well, the card, the resting hint or flat face, so a single flat sprite
-    # would blank vanilla's box and take the artwork with it.
+    well_sprite = Canvas(PREVIEW_WELL[2], PREVIEW_WELL[3])
+    sunken(well_sprite, 0, 0, PREVIEW_WELL[2], PREVIEW_WELL[3], CARD_DARK, (20, 20, 20, 255), (78, 78, 78, 255))
+    well_sprite.write(HERE / "frame" / "market_well.png")
+
+    rule = Canvas(TEXT_RIGHT - TEXT_X, 1, CARD_RULE)
+    rule.write(HERE / "frame" / "market_rule.png")
+
+    # One preview per offer, doubled so it reads as a display rather than as another inventory icon.
+    for name in MARKET_ITEMS:
+        sw, sh, spx = scaled(load_rgba(f"mcitem_{name}"), 2)
+        preview = Canvas(sw, sh)
+        for i, colour in enumerate(spx):
+            if colour[3]:
+                preview.set(i % sw, i // sw, colour)
+        preview.write(HERE / "frame" / f"market_item_{name}.png")
+
+    # The coin, for the price line.
+    coin = Canvas(16, 16)
+    blit(coin, load_rgba("gicon_coins"), 0, 0)
+    coin.write(HERE / "frame" / "market_coin.png")
+
     for slot in range(6 * 9):
         sx, sy = 8 + 18 * (slot % 9), 18 + 18 * (slot // 9)
         patch = Canvas(16, 16)
@@ -737,8 +807,7 @@ def market():
                 patch.set(dx, dy, c.px[sy + dy][sx + dx])
         patch.write(HERE / "frame" / f"mk_cover_{slot}.png")
 
-    # Hover for the two controls: their own contour, same derivation as the overview toolbar.
-    for name in ("search", "close"):
+    for name, _ in MARKET_CONTROLS:
         w_, h_, px = load_rgba(f"gicon_{name}")
         mask = {(gx + 2, gy + 2) for gy in range(h_) for gx in range(w_) if px[gy * w_ + gx][3]}
         ring = Canvas(20, 20)

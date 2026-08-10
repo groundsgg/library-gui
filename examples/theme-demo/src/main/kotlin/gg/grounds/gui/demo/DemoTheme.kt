@@ -15,8 +15,16 @@ import kotlin.io.path.inputStream
 /** Where the demo's artwork lives, relative to the module the server is started from. */
 internal val ART: Path = Path.of("art")
 
-/** The demo's one character set. */
+/** The bright character set, for anything that is the point of a line. */
 internal const val GLYPHS: String = "ascii"
+
+/**
+ * The muted one, for anything supporting it.
+ *
+ * Two families rather than one tinted at runtime, because a marker's colour channel is spent on its
+ * position payload — the only colour a glyph will ever have is the one baked into the sprite.
+ */
+internal const val GLYPHS_DIM: String = "ascii_dim"
 
 /**
  * Codepoint to pen advance, read back from what the generator measured.
@@ -148,14 +156,21 @@ object DemoTheme {
             panel("market", "panels/market.png", 176, 222)
             // One frame per drawable character, so text can be composed at runtime. A codepoint
             // with an advance but no PNG is a blank — the space — and gets no frame on purpose.
-            glyphs(GLYPHS, "glyph_", GLYPH_ADVANCES)
-            GLYPH_ADVANCES.keys
-                .filter { code -> ART.resolve("frame/glyph_$code.png").exists() }
-                .forEach { code -> frame("glyph_$code", "frame/glyph_$code.png") }
-            frame("market_card", "frame/market_card.png")
+            listOf(GLYPHS to "glyph_", GLYPHS_DIM to "glyphdim_").forEach { (set, prefix) ->
+                glyphs(set, prefix, GLYPH_ADVANCES)
+                GLYPH_ADVANCES.keys
+                    .filter { code -> ART.resolve("frame/$prefix$code.png").exists() }
+                    .forEach { code -> frame("$prefix$code", "frame/$prefix$code.png") }
+            }
+            listOf("card", "well", "rule", "coin").forEach { part ->
+                frame("market_$part", "frame/market_$part.png")
+            }
             listOf("search", "close").forEach { icon ->
                 frame("market_outline_$icon", "frame/market_outline_$icon.png")
             }
+            ART.resolve("frame").toFile().list { _, n -> n.startsWith("market_item_") }
+                ?.sorted()
+                ?.forEach { file -> frame(file.removeSuffix(".png"), "frame/$file") }
             (0 until 54).forEach { slot -> frame("mk_cover_$slot", "frame/mk_cover_$slot.png") }
             frame("menu_small", "frame/menu_small.png")
             frame("menu_wide", "frame/menu_wide.png")
