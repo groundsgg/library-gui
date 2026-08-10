@@ -213,7 +213,9 @@ fun paintMarket(dumps: Path, out: Path) {
     require(MarketLayout.GRID.right == MarketLayout.CARD.right - 18) { "grid and card must share a right edge" }
 
     panel.sunken(MarketLayout.CARD, CARD_FILL, CARD_DARK, CARD_LIGHT)
-    panel.sunken(MarketLayout.PREVIEW_WELL, CARD_DARK, WELL_INK, WELL_RIM)
+    // Flat, not sunken. The preview is a picture of the item, not a slot holding one, and a bevel
+    // around it said the opposite — the eye reads a rim as something you could click into.
+    panel.rect(MarketLayout.PREVIEW_WELL, CARD_DARK)
     panel.drawText(
         sheet,
         "Point at an item",
@@ -230,9 +232,10 @@ fun paintMarket(dumps: Path, out: Path) {
     canvas(MarketLayout.CARD_INNER.width, MarketLayout.CARD_INNER.height, CARD_FILL)
         .writeSprite(out.resolve("frame/market_card.png"))
 
+    // Both the panel and this hover sprite have to lose the rim together, or the frame reappears
+    // for exactly as long as the cursor is on an offer.
     val well = MarketLayout.PREVIEW_WELL
-    val wellSprite = canvas(well.width, well.height)
-    wellSprite.sunken(0, 0, well.width, well.height, CARD_DARK, WELL_INK, WELL_RIM)
+    val wellSprite = canvas(well.width, well.height, CARD_DARK)
     wellSprite.writeSprite(out.resolve("frame/market_well.png"))
 
     // Not tinted at runtime — unlike the contours and the dialog rule — so this carries its colour.
