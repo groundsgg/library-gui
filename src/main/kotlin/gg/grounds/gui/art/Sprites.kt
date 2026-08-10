@@ -391,3 +391,43 @@ fun hitSlots(mask: BufferedImage, rows: Int, coverage: Double = 0.5): List<Int> 
         }
     }
 }
+
+/**
+ * Writes one file per distinct patch and returns which file each key uses.
+ *
+ * The patches a screen cuts per slot repeat heavily — every empty tile on flat panel face is the
+ * same sixteen pixels square — and a copy per slot costs a file, a font provider and a codepoint
+ * each. Writing the distinct ones and pointing the rest at them costs a map.
+ *
+ * Named after the first key that produced each content, in the order given, so the same input
+ * always yields the same file names and a pack does not go stale because a loop changed direction.
+ */
+fun <K> writeDistinct(
+    patches: Map<K, BufferedImage>,
+    directory: Path,
+    name: (K) -> String,
+): Map<K, String> {
+    val byContent = LinkedHashMap<String, String>()
+    val assigned = LinkedHashMap<K, String>()
+    patches.forEach { (key, patch) ->
+        val fingerprint = fingerprint(patch)
+        val file =
+            byContent.getOrPut(fingerprint) {
+                name(key).also { patch.writeSprite(directory.resolve("$it.png")) }
+            }
+        assigned[key] = file
+    }
+    return assigned
+}
+
+/** Every pixel, in order — exact rather than hashed, since a collision here is a wrong sprite. */
+private fun fingerprint(patch: BufferedImage): String {
+    val out = StringBuilder(patch.width * patch.height * 4)
+    out.append(patch.width).append('x').append(patch.height).append(':')
+    for (row in 0 until patch.height) {
+        for (column in 0 until patch.width) {
+            out.append(Integer.toHexString(patch.getRGB(column, row))).append(',')
+        }
+    }
+    return out.toString()
+}

@@ -3,6 +3,7 @@ package gg.grounds.gui.pack
 import gg.grounds.gui.theme.FRAME_GLYPH_BASE
 import gg.grounds.gui.theme.FRAME_SPACE_BASE
 import gg.grounds.gui.theme.LAST_PRE_MINOR_FORMAT
+import gg.grounds.gui.theme.MeterAxis
 import gg.grounds.gui.theme.Spaces
 import gg.grounds.gui.theme.TITLE_ASCENT
 import gg.grounds.gui.theme.Theme
@@ -331,6 +332,18 @@ private fun withPalette(source: String, theme: Theme): String {
     return replaced
 }
 
+/**
+ * A file name for a sprite, from its texture path and whether it is a meter.
+ *
+ * The axis is part of it because it is written into the sprite's own data pixels — the same PNG
+ * declared as a bar and as a plain frame are two different textures once shipped.
+ */
+private fun spriteName(texture: String, meter: MeterAxis?): String {
+    val stem =
+        texture.substringAfterLast('/').removeSuffix(".png").replace(Regex("[^a-z0-9_.-]"), "_")
+    return if (meter == null) stem else "${stem}_${meter.name.lowercase()}"
+}
+
 private fun writeHoverFrames(theme: Theme, assets: Path, out: Path, root: Path) {
     val shader =
         checkNotNull(object {}.javaClass.getResourceAsStream("/gg/grounds/gui/pack/text.vsh")) {
@@ -344,57 +357,67 @@ private fun writeHoverFrames(theme: Theme, assets: Path, out: Path, root: Path) 
     val providers = mutableListOf<String>()
     val spaces = mutableListOf<Pair<String, String>>()
 
-    theme.frames
-        .sortedBy { it.id }
-        .forEachIndexed { index, frame ->
-            val source = assets.resolve(frame.texture)
-            require(source.isRegularFile()) {
-                "frame texture '${frame.texture}' not found under $assets"
-            }
-            val art =
-                source.inputStream().buffered().use { ImageIO.read(it) }
-                    ?: throw IllegalArgumentException("frame '${frame.id}' is not a readable image")
-            require(art.width in 4..256 && art.height in 1..256) {
-                "frame '${frame.id}' is ${art.width}x${art.height}; it must be at least 4 wide for the " +
-                    "data pixels and at most 256 in each direction, since the size is carried in a byte"
-            }
+    // One glyph per distinct sprite rather than per frame. A screen whose empty tiles all sit on
+    // flat panel face names a patch per slot and they are the same patch; shipping each of them
+    // spends a file, a provider and a codepoint on a copy.
+    // Named after the texture rather than after whichever frame happens to mention it first, so
+    // reordering declarations cannot rename a file and make every cached pack stale.
+    val spriteNames =
+        theme.frameSprites.associateWith { (texture, meter) -> spriteName(texture, meter) }
+    require(spriteNames.values.distinct().size == spriteNames.size) {
+        "two frame textures reduce to the same file name: ${spriteNames.values.groupBy { it }.filterValues { it.size > 1 }.keys}"
+    }
 
-            val wrapped = BufferedImage(art.width, art.height + 2, BufferedImage.TYPE_INT_ARGB)
-            val canvas = wrapped.createGraphics()
-            canvas.drawImage(art, 0, 1, null)
-            canvas.dispose()
-            // Blue was zero here and read by nobody; it now says whether this sprite is a meter.
-            val size =
-                (0xFF shl 24) or
-                    ((art.width - 1) shl 16) or
-                    ((art.height - 1) shl 8) or
-                    (frame.meter?.code ?: 0)
-            listOf(0, art.height + 1).forEach { row ->
-                wrapped.setRGB(0, row, FRAME_ID_ARGB)
-                wrapped.setRGB(art.width - 1, row, FRAME_ID_ARGB)
-                wrapped.setRGB(1, row, size)
-                wrapped.setRGB(art.width - 2, row, size)
-            }
-
-            val target = root / "textures" / "font" / "frame_${frame.id}.png"
-            target.parent.createDirectories()
-            target.outputStream().buffered().use { ImageIO.write(wrapped, "png", it) }
-
-            providers +=
-                Json.obj(
-                    "type" to Json.string("bitmap"),
-                    "file" to Json.string("${theme.namespace}:font/frame_${frame.id}.png"),
-                    "ascent" to Json.number(TITLE_ASCENT),
-                    "height" to Json.number(FRAME_GLYPH_HEIGHT),
-                    "chars" to
-                        Json.array(
-                            listOf(Json.string(String(Character.toChars(FRAME_GLYPH_BASE + index))))
-                        ),
-                )
-            spaces +=
-                String(Character.toChars(FRAME_SPACE_BASE + index)) to
-                    Json.number(-scaledAdvance(wrapped, FRAME_GLYPH_HEIGHT))
+    theme.frameSprites.forEachIndexed { index, sprite ->
+        val (texture, meter) = sprite
+        val name = spriteNames.getValue(sprite)
+        val frame = theme.frames.first { it.texture == texture && it.meter == meter }
+        val source = assets.resolve(texture)
+        require(source.isRegularFile()) { "frame texture '$texture' not found under $assets" }
+        val art =
+            source.inputStream().buffered().use { ImageIO.read(it) }
+                ?: throw IllegalArgumentException("frame '${frame.id}' is not a readable image")
+        require(art.width in 4..256 && art.height in 1..256) {
+            "frame '${frame.id}' is ${art.width}x${art.height}; it must be at least 4 wide for the " +
+                "data pixels and at most 256 in each direction, since the size is carried in a byte"
         }
+
+        val wrapped = BufferedImage(art.width, art.height + 2, BufferedImage.TYPE_INT_ARGB)
+        val canvas = wrapped.createGraphics()
+        canvas.drawImage(art, 0, 1, null)
+        canvas.dispose()
+        // Blue was zero here and read by nobody; it now says whether this sprite is a meter.
+        val size =
+            (0xFF shl 24) or
+                ((art.width - 1) shl 16) or
+                ((art.height - 1) shl 8) or
+                (meter?.code ?: 0)
+        listOf(0, art.height + 1).forEach { row ->
+            wrapped.setRGB(0, row, FRAME_ID_ARGB)
+            wrapped.setRGB(art.width - 1, row, FRAME_ID_ARGB)
+            wrapped.setRGB(1, row, size)
+            wrapped.setRGB(art.width - 2, row, size)
+        }
+
+        val target = root / "textures" / "font" / "frame_$name.png"
+        target.parent.createDirectories()
+        target.outputStream().buffered().use { ImageIO.write(wrapped, "png", it) }
+
+        providers +=
+            Json.obj(
+                "type" to Json.string("bitmap"),
+                "file" to Json.string("${theme.namespace}:font/frame_$name.png"),
+                "ascent" to Json.number(TITLE_ASCENT),
+                "height" to Json.number(FRAME_GLYPH_HEIGHT),
+                "chars" to
+                    Json.array(
+                        listOf(Json.string(String(Character.toChars(FRAME_GLYPH_BASE + index))))
+                    ),
+            )
+        spaces +=
+            String(Character.toChars(FRAME_SPACE_BASE + index)) to
+                Json.number(-scaledAdvance(wrapped, FRAME_GLYPH_HEIGHT))
+    }
 
     providers.add(
         0,

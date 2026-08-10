@@ -9,6 +9,7 @@ import gg.grounds.gui.theme.PackFormat
 import gg.grounds.gui.theme.TITLE_INSET
 import gg.grounds.gui.theme.Sequence
 import gg.grounds.gui.theme.Theme
+import gg.grounds.gui.theme.ThemeBuilder
 import gg.grounds.gui.theme.theme
 import java.nio.file.Path
 import java.util.Properties
@@ -82,6 +83,20 @@ internal val SHAPE_SLOTS: Map<String, List<Int>> by lazy {
     ART.resolve("frame/shapes.properties").inputStream().use(table::load)
     table.entries.associate { (key, value) ->
         key.toString() to value.toString().split(",").filter(String::isNotBlank).map(String::toInt)
+    }
+}
+
+/**
+ * Declares one frame per slot, pointing at whichever file that slot's patch was folded onto.
+ *
+ * The names stay per slot because that is what a screen asks for; the sharing lives in the paths,
+ * where the library turns it into a single glyph.
+ */
+private fun ThemeBuilder.declarePatches(screen: String) {
+    val table = Properties()
+    ART.resolve("frame/${screen}_patches.properties").inputStream().use(table::load)
+    table.entries.forEach { (key, value) ->
+        frame(key.toString().replace('.', '_'), "frame/$value.png")
     }
 }
 
@@ -230,16 +245,15 @@ object DemoTheme {
             ART.resolve("frame").toFile().list { _, n -> n.startsWith("market_item_") }
                 ?.sorted()
                 ?.forEach { file -> frame(file.removeSuffix(".png"), "frame/$file") }
-            (0 until 54).forEach { slot -> frame("mk_cover_$slot", "frame/mk_cover_$slot.png") }
+            declarePatches("market")
             frame("slot_cover", "frame/slot_cover.png")
             frame("slot_hover", "frame/slot_hover.png")
             frame("ov_slot", "frame/ov_slot.png")
             frame("ov_cover", "frame/ov_cover.png")
-            // Two per slot, each cut out of the overview panel itself. See openOverview.
-            (0 until 54).forEach { slot ->
-                frame("ov_cover_$slot", "frame/ov_cover_$slot.png")
-                frame("ov_hover_$slot", "frame/ov_hover_$slot.png")
-            }
+            // Two per slot, each cut out of the overview panel itself. See openOverview. Many
+            // slots share a sprite — most of that screen is flat panel face — so the ids stay one
+            // per slot while the files behind them do not.
+            declarePatches("overview")
             TOOLBAR_ICONS.forEach { (name, _) ->
                 frame("ov_icon_$name", "frame/ov_icon_$name.png")
                 frame("ov_outline_$name", "frame/ov_outline_$name.png")
