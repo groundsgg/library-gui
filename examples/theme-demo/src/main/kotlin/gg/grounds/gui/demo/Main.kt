@@ -24,7 +24,6 @@ import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
 
-private val ART: Path = Path.of("art")
 private val OUT: Path = Path.of("build/demo-pack")
 
 /**
@@ -78,7 +77,13 @@ fun main() {
     // button looks broken, so the demo echoes exactly what arrived.
     MinecraftServer.getGlobalEventHandler().addListener(PlayerCustomClickEvent::class.java) { event ->
         val payload = event.payload as? CompoundBinaryTag
-        event.player.sendMessage(describeSubmission(event.key, payload))
+        // The market's search is the one submission that is not just reported back: it reopens the
+        // container it came from. Everything else is a dialog demonstrating dialogs.
+        if (event.key.value() == MARKET_SEARCH) {
+            openMarket(event.player, payload?.getString("query").orEmpty())
+        } else {
+            event.player.sendMessage(describeSubmission(event.key, payload))
+        }
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) { event ->
@@ -188,6 +193,10 @@ private fun registerCommands(packs: Packs) {
         )
     }
     MinecraftServer.getCommandManager().register(tint)
+
+    val market = Command("market")
+    market.setDefaultExecutor { sender, _ -> (sender as? Player)?.let { openMarket(it) } }
+    MinecraftServer.getCommandManager().register(market)
 
     val menu = Command("menu")
     menu.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openMenu) }
@@ -358,6 +367,15 @@ private fun welcome(): Component =
         .append(
             Component.text(
                 " opens the storybook: every element, every container type.\n",
+                NamedTextColor.GRAY,
+            )
+        )
+        .append(Component.text("/market", NamedTextColor.AQUA))
+        .append(
+            Component.text(
+                " opens a shop: the description lands in a fixed card instead of a tooltip, every " +
+                    "line of it composed at runtime, and the search runs through a dialog because a " +
+                    "container cannot read a keystroke.\n",
                 NamedTextColor.GRAY,
             )
         )

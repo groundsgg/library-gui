@@ -157,6 +157,29 @@ private fun form(): Dialog =
     )
 
 /**
+ * The one dialog that is not a demo of dialogs but a part of another screen.
+ *
+ * A container screen cannot read a keystroke — there is no packet that would carry one. A dialog
+ * can, and hands back a typed payload. So the market's search button closes the container, opens
+ * this, and the listener reopens the container with whatever was typed. Neither half is new; that
+ * they can be pointed at each other is the whole idea.
+ *
+ * `dynamic/custom` is the action, because it is one of only two that carry the input at all — the
+ * plainly named `custom` discards it.
+ */
+fun marketSearchDialog(current: String): Dialog =
+    Dialog.MultiAction(
+        meta(
+            "Search the market",
+            listOf(body("Part of an item's name. Leave it empty to see everything again.")),
+            listOf(DialogInput.Text("query", 200, Component.text("Name"), true, current, 32, null)),
+        ),
+        listOf(submits("Search", MARKET_SEARCH)),
+        button("Cancel", null),
+        1,
+    )
+
+/**
  * Formats what came back.
  *
  * The client flattens every input into one compound keyed by the input's own key, and the types are

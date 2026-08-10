@@ -485,6 +485,46 @@ def draw_text(canvas, sheet, text, x, y, colour=(255, 255, 255, 255), shadow=Tru
         pen += advance
 
 
+def glyph_frames():
+    """One frame per printable character, plus the advance table that positions them.
+
+    Labels painted into a panel are fixed at build time, which is fine for a button that always
+    says "Shop" and useless for a price. A frame per character turns text into something the
+    server composes at runtime: one marker per glyph, each placed at the running pen position.
+
+    The advances have to travel with the sprites, because only this side measures them — the
+    vanilla sheet is proportional, `1` is not as wide as `W`. Writing them next to the PNGs and
+    having Kotlin read them back is what keeps a second, drifting copy from existing.
+
+    No drop shadow: vanilla draws one by emitting the whole string a second time, and here that
+    would double the markers for an effect that hurts on a light panel anyway.
+    """
+    sheet = load_rgba("ascii")
+    advances = {}
+    for code in range(32, 127):
+        ch = chr(code)
+        pixels, advance = ascii_glyph(sheet, ch)
+        advances[code] = advance
+        if not pixels:
+            continue
+        # A frame needs four pixels of width for the marker's own data row, and `i`, `.`, `!` and
+        # `|` are narrower than that. Padding on the right is free: the glyph still starts at x=0,
+        # so it draws where it always did, and the extra columns are transparent.
+        width = max(max(x for x, _, _ in pixels) + 1, 4)
+        height = max(y for _, y, _ in pixels) + 1
+        glyph = Canvas(width, height)
+        for gx, gy, _ in pixels:
+            glyph.set(gx, gy, WHITE)
+        glyph.write(HERE / "frame" / f"glyph_{code}.png")
+
+    table = HERE / "frame" / "glyphs.properties"
+    table.write_text(
+        "# codepoint=advance, measured off the client's own ascii sheet\n"
+        + "".join(f"{code}={advance}\n" for code, advance in sorted(advances.items()))
+    )
+    print(f"{table.relative_to(HERE)}  {len(advances)} advances")
+
+
 def menu():
     """A menu whose buttons span several slots each, painted with vanilla's own button sprite.
 
@@ -639,6 +679,79 @@ def overview():
         cv.write(HERE / "frame" / f"ov_icon_{name}.png")
 
 
+# The detail card: a sunken panel under the item grid, and the region a hover writes into.
+CARD = (8, 68, 160, 62)
+CARD_INNER = (CARD[0] + 3, CARD[1] + 3, CARD[2] - 6, CARD[3] - 6)
+
+
+def market():
+    """A shop whose detail card is part of the window rather than a box chasing the cursor.
+
+    Vanilla puts an item's description in a tooltip that follows the mouse and is sized by its own
+    text. A marker can put artwork anywhere in the window, so the description goes where the layout
+    wants it: a fixed card under the grid, the same place every time, with room for four lines.
+
+    Everything written into that card is composed at runtime from the glyph frames, because none of
+    it is known when the pack is built — a price is a number the server holds.
+    """
+    sheet = load_rgba("ascii")
+    c = window(PANEL_W, OV_H)
+
+    # Item grid, seven wide.
+    for row in range(3):
+        for col in range(1, 8):
+            well(c, 7 + 18 * col, 17 + 18 * row)
+    group_frame(c, 1, 0, 7, 2)
+
+    # Two controls in the spare right-hand column: search, and clear.
+    for icon, row in (("search", 0), ("close", 1)):
+        blit(c, load_rgba(f"gicon_{icon}"), 8 + 18 * 8, 18 + 18 * row)
+
+    # The card. Sunken, so it reads as a display rather than as something clickable.
+    x, y, w, h = CARD
+    c.rect(x, y, w, h, WELL_FACE)
+    c.rect(x, y, w - 1, 1, WELL_DARK)
+    c.rect(x, y, 1, h - 1, WELL_DARK)
+    c.rect(x + 1, y + h - 1, w - 1, 1, WELL_LIGHT)
+    c.rect(x + w - 1, y + 1, 1, h - 1, WELL_LIGHT)
+
+    hint = "Point at an item"
+    draw_text(c, sheet, hint, x + (w - text_width(sheet, hint)) // 2, y + h // 2 - 4,
+              (90, 90, 90, 255), shadow=False)
+
+    player_wells(c, OV_H)
+    c.write(HERE / "panels" / "market.png")
+
+    # One patch over the card's interior, to blank the resting hint before a hover writes over it.
+    # The interior is a single flat colour, so one sprite covers it however the text is laid out.
+    Canvas(CARD_INNER[2], CARD_INNER[3], WELL_FACE).write(HERE / "frame" / "market_card.png")
+
+    # A patch per slot, cut out of this panel. Same reasoning as the overview: what sits under an
+    # empty tile here is a well, the card, the resting hint or flat face, so a single flat sprite
+    # would blank vanilla's box and take the artwork with it.
+    for slot in range(6 * 9):
+        sx, sy = 8 + 18 * (slot % 9), 18 + 18 * (slot // 9)
+        patch = Canvas(16, 16)
+        for dy in range(16):
+            for dx in range(16):
+                patch.set(dx, dy, c.px[sy + dy][sx + dx])
+        patch.write(HERE / "frame" / f"mk_cover_{slot}.png")
+
+    # Hover for the two controls: their own contour, same derivation as the overview toolbar.
+    for name in ("search", "close"):
+        w_, h_, px = load_rgba(f"gicon_{name}")
+        mask = {(gx + 2, gy + 2) for gy in range(h_) for gx in range(w_) if px[gy * w_ + gx][3]}
+        ring = Canvas(20, 20)
+        for radius, colour in ((2, (87, 214, 236, 110)), (1, (27, 95, 190, 255))):
+            for mx, my in mask:
+                for dy in range(-radius, radius + 1):
+                    for dx in range(-radius, radius + 1):
+                        at = (mx + dx, my + dy)
+                        if at not in mask and 0 <= at[0] < 20 and 0 <= at[1] < 20:
+                            ring.set(at[0], at[1], colour)
+        ring.write(HERE / "frame" / f"market_outline_{name}.png")
+
+
 def storybook():
     """The storybook index, given the same window chrome as everything else.
 
@@ -696,3 +809,5 @@ if __name__ == "__main__":
     storybook()
     overview()
     slot_cover()
+    glyph_frames()
+    market()

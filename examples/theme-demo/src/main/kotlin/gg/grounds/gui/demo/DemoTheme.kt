@@ -7,7 +7,29 @@ import gg.grounds.gui.theme.TITLE_INSET
 import gg.grounds.gui.theme.Theme
 import gg.grounds.gui.theme.theme
 import java.nio.file.Path
+import java.util.Properties
 import kotlin.io.path.deleteRecursively
+import kotlin.io.path.exists
+import kotlin.io.path.inputStream
+
+/** Where the demo's artwork lives, relative to the module the server is started from. */
+internal val ART: Path = Path.of("art")
+
+/** The demo's one character set. */
+internal const val GLYPHS: String = "ascii"
+
+/**
+ * Codepoint to pen advance, read back from what the generator measured.
+ *
+ * The numbers belong to the sprites: vanilla's sheet is proportional, so `1` is not as wide as `W`,
+ * and only the side that cut the glyphs knows by how much. Reading the table it wrote is what keeps
+ * a second copy of those widths — the kind that drifts one pixel at a time — from existing here.
+ */
+internal val GLYPH_ADVANCES: Map<Int, Int> by lazy {
+    val table = Properties()
+    ART.resolve("frame/glyphs.properties").inputStream().use(table::load)
+    table.entries.associate { (key, value) -> key.toString().toInt() to value.toString().toInt() }
+}
 
 /**
  * The demo's theme, with the three title offsets left mutable so they can be dialled in against a
@@ -123,6 +145,18 @@ object DemoTheme {
             panel("menu", "panels/menu.png", 176, 168)
             panel("story", "panels/story.png", 176, 222)
             panel("overview", "panels/overview.png", 176, 222)
+            panel("market", "panels/market.png", 176, 222)
+            // One frame per drawable character, so text can be composed at runtime. A codepoint
+            // with an advance but no PNG is a blank — the space — and gets no frame on purpose.
+            glyphs(GLYPHS, "glyph_", GLYPH_ADVANCES)
+            GLYPH_ADVANCES.keys
+                .filter { code -> ART.resolve("frame/glyph_$code.png").exists() }
+                .forEach { code -> frame("glyph_$code", "frame/glyph_$code.png") }
+            frame("market_card", "frame/market_card.png")
+            listOf("search", "close").forEach { icon ->
+                frame("market_outline_$icon", "frame/market_outline_$icon.png")
+            }
+            (0 until 54).forEach { slot -> frame("mk_cover_$slot", "frame/mk_cover_$slot.png") }
             frame("menu_small", "frame/menu_small.png")
             frame("menu_wide", "frame/menu_wide.png")
             frame("slot_cover", "frame/slot_cover.png")
