@@ -9,6 +9,11 @@ dependencies {
 }
 ```
 
+## Compatibility
+
+`library-gui` 0.2.x targets Minecraft 26.2 with Minestom `2026.07.22-26.2` and JVM 25.
+The host supplies Minestom; consumers must not shade a second copy.
+
 ## Basics
 
 One `Gui` instance serves one player — Minestom shares a single item array and
@@ -273,7 +278,7 @@ items in their material's own model. Nothing breaks, it just looks ordinary.
   path matters: Minestom fires no `InventoryCloseEvent` when another
   inventory opens over this one. `onClose` handlers run one tick after the
   close — that makes `onClose { parentMenu.open() }` safe (a GUI opened
-  *inside* Minestom's close dispatch would be silently undone).
+  _inside_ Minestom's close dispatch would be silently undone).
 - **`preventClose = true`** reopens the GUI when the client tries to close
   it; `close()` always works.
 - **`every(TaskSchedule.tick(20)) { }`** for animations. Slot updates skip
@@ -284,3 +289,10 @@ items in their material's own model. Nothing breaks, it just looks ordinary.
   arrives on roughly every keystroke.
 - **Threading.** Call GUI methods from the tick thread (event handlers and
   scheduler tasks already are).
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE), the same terms every other
+public Grounds repository carries. The repository was public for a while with
+no license file at all, which means "all rights reserved" — this states the
+terms that were always intended.
