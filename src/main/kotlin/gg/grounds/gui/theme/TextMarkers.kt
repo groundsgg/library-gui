@@ -81,10 +81,13 @@ private fun GlyphSet.advanceOf(setId: String, codepoint: Int): Int =
  * the screen, which is the one point the shader already computes. So these coordinates are that
  * offset directly — (0, 0) is the centre, negative is up and left.
  *
- * Whether this works at all is a property of where the glyph rides: markers live in text, the
- * client draws a dialog's body with the same font pipeline as a container's title, and the shader
- * does not care which screen asked. The ±128px reach is unchanged and matters more here, since a
- * dialog is wider than the span of a signed byte.
+ * That this works at all is a property of where the glyph rides: markers live in text, the client
+ * draws a dialog's body with the same font pipeline as a container's title, and the shader does not
+ * care which screen asked. Confirmed against a 26.2 client — a dialog is decorated by exactly the
+ * mechanism that outlines a container slot, which the dialog format itself offers no way to do.
+ *
+ * The ±128px reach is unchanged and matters more here, since a dialog is wider than the span of a
+ * signed byte.
  */
 fun Theme.screenMarker(id: String, x: Int, y: Int, tint: String? = null): Component =
     frameMarker(id, x, y, imageWidth = 0, imageHeight = 0, tint = tint)
