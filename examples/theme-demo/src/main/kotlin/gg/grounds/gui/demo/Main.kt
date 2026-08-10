@@ -117,6 +117,17 @@ private class Packs(
         private set
 
     /** Regenerates the pack from the current offsets, republishes it, and returns its SHA-1. */
+    /**
+     * This pack's identity, stable across rebuilds and restarts.
+     *
+     * The id is how a client recognises a pack it already holds: a new one every time means a new
+     * pack every time, so replacing a pack becomes adding a second copy of it, and the stack grows
+     * with every reload. Derived from the namespace so two themes cannot collide and one theme
+     * cannot drift.
+     */
+    private val PACK_ID: UUID =
+        UUID.nameUUIDFromBytes("grounds:pack:${DemoTheme.NAMESPACE}".toByteArray())
+
     fun rebuild(): String {
         val (zip, sha1) = DemoTheme.rebuild(ART, OUT)
         host.publish(zip)
@@ -124,9 +135,13 @@ private class Packs(
         // matters, because a required pack whose hash is stale kicks every player who joins.
         request =
             ResourcePackRequest.resourcePackRequest()
-                .packs(ResourcePackInfo.resourcePackInfo(UUID.randomUUID(), URI.create(url), sha1))
+                .packs(ResourcePackInfo.resourcePackInfo(PACK_ID, URI.create(url), sha1))
                 .required(required)
-                .replace(true)
+                // Never replace. A client can hold several server packs at once, and replacing
+                // drops every one it already has — including packs this server never sent. A
+                // platform shipping a GUI pack beside a scene pack would have each of them
+                // removing the other, in whichever order they happened to arrive.
+                .replace(false)
                 .prompt(Component.text("library-gui theme demo", NamedTextColor.GOLD))
                 .callback(
                     ResourcePackCallback { id, status, _ ->

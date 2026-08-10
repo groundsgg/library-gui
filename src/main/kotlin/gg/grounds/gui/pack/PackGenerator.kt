@@ -489,3 +489,42 @@ private fun sha1(file: Path): String {
     }
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
+
+/**
+ * The vanilla paths this theme's pack will overwrite, relative to `assets/minecraft`.
+ *
+ * Everything else a pack writes lives under its own namespace and cannot collide with anything.
+ * These cannot: they are the client's own files, one pack in a stack wins each of them outright,
+ * and which one wins is decided by pack order rather than by anyone's intent.
+ *
+ * So a pack has to be able to say what it claims before it is shipped alongside another. Listing it
+ * by hand does not work — the list was written down once as "the text shader and the slot
+ * highlight" and was missing the bundle sprites and, more quietly, the language file, which is
+ * replaced wholesale by any pack that touches a single key.
+ *
+ * Derived from the theme rather than from the output, so a caller can ask before generating and a
+ * test can hold the two against each other.
+ */
+fun Theme.vanillaOverrides(): List<String> =
+    buildList {
+            // The shader is what relocates markers; without frames there is nothing to relocate.
+            if (frames.isNotEmpty()) add("shaders/core/text.vsh")
+            slotHighlight?.let {
+                add("textures/gui/sprites/container/slot_highlight_back.png")
+                add("textures/gui/sprites/container/slot_highlight_front.png")
+            }
+            if (bundleFiller) {
+                // Each sprite ships its own .mcmeta, and both count: a pack that claims the png and
+                // not the meta leaves the client reading another pack's animation for its texture.
+                // This pair is what the first hand-written version of this list missed, and the
+                // test comparing claim against output caught it on its first run.
+                listOf("bundle_progressbar_border", "bundle_progressbar_fill").forEach { sprite ->
+                    add("textures/gui/sprites/container/bundle/$sprite.png")
+                    add("textures/gui/sprites/container/bundle/$sprite.png.mcmeta")
+                }
+                // Language files merge per key, so this replaces exactly two strings — but a pack
+                // that ships it at all owns the file as far as another pack is concerned.
+                add("lang/en_us.json")
+            }
+        }
+        .sorted()
