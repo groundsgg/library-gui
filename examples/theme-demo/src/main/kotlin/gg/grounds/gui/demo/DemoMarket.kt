@@ -45,6 +45,16 @@ private const val PRICE_Y = 109
 
 /** Eight columns wide, so the grid ends on the same margins as the card under it. */
 private val GRID_SLOTS: List<Int> = (0..2).flatMap { row -> (0..7).map { col -> row * 9 + col } }
+/**
+ * The controls in the spare column, and the one list that names them.
+ *
+ * Three rows, because two buttons beside a three-row grid left a notch. The list lives here and
+ * [DemoTheme] registers from it: the first cut spelled the icons out in both places, the third
+ * button reached only one of them, and the screen threw on open with a frame it had never
+ * declared.
+ */
+internal val MARKET_CONTROLS = listOf("search" to 8, "close" to 17, "question" to 26)
+
 private const val SEARCH_SLOT = 8
 private const val CLEAR_SLOT = 17
 private const val HELP_SLOT = 26
@@ -89,6 +99,17 @@ private val CATALOGUE =
         Offer(Material.FEATHER, "feather", "Feather", 3, "For arrows"),
         Offer(Material.STICK, "stick", "Stick", 1, "For everything else"),
     )
+
+/** The preview frames the catalogue can ask for, so a test can check they all exist. */
+internal val MARKET_TEXTURES: List<String> = CATALOGUE.map { it.texture }
+
+/** Every string the card can write, so a test can lay each one out where it will really go. */
+internal val MARKET_LINES: List<String> =
+    CATALOGUE.flatMap { listOf(it.name, it.note, it.price.toString()) } +
+        listOf("Search", "Type part of a name", "Clear", "Nothing filtered", "How this works", "Hover writes here")
+
+/** The fixed pieces of the card, named once. */
+internal val MARKET_CARD_PARTS: List<String> = listOf("card", "well", "rule", "coin")
 
 /** What each player is currently filtering by. Empty means the whole catalogue. */
 private val queries = mutableMapOf<UUID, String>()
