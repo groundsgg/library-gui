@@ -41,6 +41,40 @@ object DemoTheme {
      */
     var slotGlow: Boolean = false
 
+    /**
+     * Whether the pack blanks vanilla's slot hover box.
+     *
+     * On by default, and it is the only thing that stops the click flicker. A left click makes the
+     * client predict a pickup; the slot goes empty, its tooltip vanishes, and every marker riding
+     * in that tooltip vanishes with it — verified as unavoidable, since only `Slot.mayPickup` gates
+     * the pickup and no item property reaches it. What was visible in those frames was vanilla's
+     * own hover box appearing underneath. Blank it and there is nothing left to appear.
+     *
+     * Off by default, because the cost lands outside the screen it helps: it is a vanilla sprite,
+     * so blanking it removes the box in every container, the player's own inventory included.
+     * `/highlight` flips it, and the demo hands the highlight back per slot where it is blanked —
+     * which is the only way a themed screen gets to choose.
+     */
+    var blankHighlight: Boolean = false
+
+    /**
+     * Whether a hovered empty tile is tinted or left looking untouched.
+     *
+     * Off by default: an empty tile is not a control, so pointing at it should do nothing, and the
+     * patch that hides vanilla's box is cut at no tint at all. On, the same patch is lifted toward
+     * white and the tile gets a hover of its own.
+     *
+     * Both sets ship in the pack, so `/tint` only changes which glyph the server names — no
+     * rebuild, no re-download, and the two can be compared without leaving the screen.
+     */
+    var tintEmpty: Boolean = false
+
+    /** The overview's patch for the empty tile in [slot], in whichever family is selected. */
+    fun overviewTile(slot: Int): String = if (tintEmpty) "ov_hover_$slot" else "ov_cover_$slot"
+
+    /** The menu's patch for an empty tile — one sprite serves all of them, they are all flat face. */
+    fun menuTile(): String = if (tintEmpty) "slot_hover" else "slot_cover"
+
     // A panel's advance is deliberately not tunable. The generator measures what the client will
     // actually use — it trims fully transparent columns off the right before measuring — and fails
     // the build with the correct number, so an override here could only ever be the wrong one.
@@ -68,17 +102,48 @@ object DemoTheme {
         theme(NAMESPACE, PackFormat(88, minInclusive = 84, maxInclusive = 88)) {
             description = "library-gui theme demo"
             panel(PANEL, "panels/shop.png", PANEL_W, PANEL_H, offsetX = offsetX, offsetY = offsetY)
+            listOf("screen_shop" to (176 to 222), "screen_toolbar" to (176 to 133),
+                    "screen_forge" to (176 to 166), "screen_centred" to (176 to 166))
+                .forEach { (id, size) -> panel(id, "panels/$id.png", size.first, size.second) }
             icon(ICON, "icons/coin.png")
-            icon(BLANK, "icons/blank.png")
+            emptyIcon(BLANK)
+            bundleFiller()
             tooltip(BLANK, "tooltips/blank_bg.png", "tooltips/blank_frame.png")
             tooltip(TOOLTIP, "tooltips/gold_bg.png", "tooltips/gold_frame.png")
             tooltip(TOOLTIP_TOOL, "tooltips/steel_bg.png", "tooltips/steel_frame.png")
             // Global by nature: this replaces the vanilla sprite, so the glow appears in every
             // container, the player's own inventory included. There is no way to scope it to one
             // GUI, which is exactly why it is a switch here rather than a given.
-            if (slotGlow) slotHighlight("highlight/back.png", "highlight/front.png")
+            when {
+                slotGlow -> slotHighlight("highlight/back.png", "highlight/front.png")
+                blankHighlight -> slotHighlight("highlight/blank_back.png", "highlight/blank_front.png")
+            }
             // The one hover effect that can be scoped to a region of one GUI — at the price of
             // overriding a vanilla shader.
+            panel("menu", "panels/menu.png", 176, 168)
+            panel("story", "panels/story.png", 176, 222)
+            panel("overview", "panels/overview.png", 176, 222)
+            frame("menu_small", "frame/menu_small.png")
+            frame("menu_wide", "frame/menu_wide.png")
+            frame("slot_cover", "frame/slot_cover.png")
+            frame("slot_hover", "frame/slot_hover.png")
+            frame("ov_slot", "frame/ov_slot.png")
+            frame("ov_cover", "frame/ov_cover.png")
+            // Two per slot, each cut out of the overview panel itself. See openOverview.
+            (0 until 54).forEach { slot ->
+                frame("ov_cover_$slot", "frame/ov_cover_$slot.png")
+                frame("ov_hover_$slot", "frame/ov_hover_$slot.png")
+            }
+            TOOLBAR_ICONS.forEach { (name, _) ->
+                frame("ov_icon_$name", "frame/ov_icon_$name.png")
+                frame("ov_outline_$name", "frame/ov_outline_$name.png")
+            }
+            listOf("small", "wide").forEach { size ->
+                frame("menu_face_$size", "frame/menu_face_$size.png")
+            }
+            listOf("shop", "kits", "play", "settings", "profile").forEach { id ->
+                frame("menu_label_$id", "frame/menu_label_$id.png")
+            }
             frame("square", "frame/square.png")
             frame("triangle", "frame/triangle.png")
         }

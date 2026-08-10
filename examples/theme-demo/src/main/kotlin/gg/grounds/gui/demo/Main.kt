@@ -17,7 +17,9 @@ import net.minestom.server.command.builder.arguments.ArgumentType
 import net.minestom.server.coordinate.Pos
 import net.minestom.server.entity.GameMode
 import net.minestom.server.entity.Player
+import net.kyori.adventure.nbt.CompoundBinaryTag
 import net.minestom.server.event.player.AsyncPlayerConfigurationEvent
+import net.minestom.server.event.player.PlayerCustomClickEvent
 import net.minestom.server.event.player.PlayerSpawnEvent
 import net.minestom.server.instance.LightingChunk
 import net.minestom.server.instance.block.Block
@@ -70,6 +72,13 @@ fun main() {
         // before it sends FinishConfiguration, so the pack is loaded before the player spawns and
         // therefore before any GUI can open. Sending after spawn would race the first /gui.
         player.sendResourcePacks(packs.request)
+    }
+
+    // The whole point of a dialog is that something comes back. Without a listener the submit
+    // button looks broken, so the demo echoes exactly what arrived.
+    MinecraftServer.getGlobalEventHandler().addListener(PlayerCustomClickEvent::class.java) { event ->
+        val payload = event.payload as? CompoundBinaryTag
+        event.player.sendMessage(describeSubmission(event.key, payload))
     }
 
     MinecraftServer.getGlobalEventHandler().addListener(PlayerSpawnEvent::class.java) { event ->
@@ -132,6 +141,65 @@ private fun registerCommands(packs: Packs) {
     val story = Command("story")
     story.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openStorybook) }
     MinecraftServer.getCommandManager().register(story)
+
+    val overview = Command("overview")
+    overview.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openOverview) }
+    MinecraftServer.getCommandManager().register(overview)
+
+    val highlight = Command("highlight")
+    highlight.setDefaultExecutor { sender, _ ->
+        val player = sender as? Player ?: return@setDefaultExecutor
+        if (player.packPending()) {
+            player.sendMessage(stillLoading())
+        } else {
+            DemoTheme.blankHighlight = !DemoTheme.blankHighlight
+            val sha1 = packs.rebuild()
+            player.sendResourcePacks(packs.request)
+            player.sendMessage(
+                Component.text(
+                    if (DemoTheme.blankHighlight) {
+                        "Vanilla hover box blanked everywhere; themed screens hand it back per slot."
+                    } else {
+                        "Vanilla hover box restored everywhere — multi-slot buttons flash on click."
+                    },
+                    NamedTextColor.GREEN,
+                )
+            )
+            player.sendMessage(rebuilt(sha1))
+        }
+    }
+    MinecraftServer.getCommandManager().register(highlight)
+
+    // No pack rebuild here, deliberately: both patch families ship in the pack, so this only
+    // changes which glyph the server names. Reopening the screen is enough to see it.
+    val tint = Command("tint")
+    tint.setDefaultExecutor { sender, _ ->
+        val player = sender as? Player ?: return@setDefaultExecutor
+        DemoTheme.tintEmpty = !DemoTheme.tintEmpty
+        player.sendMessage(
+            Component.text(
+                if (DemoTheme.tintEmpty) {
+                    "Empty tiles now hover to a soft tint. Reopen the screen."
+                } else {
+                    "Empty tiles no longer answer the cursor at all. Reopen the screen."
+                },
+                NamedTextColor.GREEN,
+            )
+        )
+    }
+    MinecraftServer.getCommandManager().register(tint)
+
+    val menu = Command("menu")
+    menu.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openMenu) }
+    MinecraftServer.getCommandManager().register(menu)
+
+    val dialogs = Command("dialog")
+    dialogs.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openDialogIndex) }
+    MinecraftServer.getCommandManager().register(dialogs)
+
+    val screens = Command("ui")
+    screens.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openScreenGallery) }
+    MinecraftServer.getCommandManager().register(screens)
 
     val hover = Command("hover")
     hover.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openHoverGui) }

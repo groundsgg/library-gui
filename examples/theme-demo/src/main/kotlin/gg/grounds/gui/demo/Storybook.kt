@@ -9,6 +9,7 @@ import gg.grounds.gui.head
 import gg.grounds.gui.item
 import gg.grounds.gui.layout
 import gg.grounds.gui.pagedGui
+import gg.grounds.gui.theme.chestAnchor
 import gg.grounds.gui.theme.title
 import gg.grounds.gui.toggleButton
 import java.time.Duration
@@ -278,9 +279,18 @@ private val stories: List<Story> by lazy {
  * it is indexing seemed worth more than a second flat menu.
  */
 fun openStorybook(player: Player) {
+    val theme = DemoTheme.current()
     pagedGui(
         player,
-        title = { page, pages -> Component.text("Storybook ${page + 1}/$pages", NamedTextColor.DARK_GRAY) },
+        // Same window chrome as every other screen: wells under the entries, button faces under
+        // the navigation slots. An index that looks like a bare chest reads as unfinished.
+        title = { page, pages ->
+            theme.title(
+                "story",
+                Component.text("Storybook ${page + 1}/$pages", NamedTextColor.DARK_GRAY),
+                chestAnchor(6),
+            )
+        },
         items = stories,
         rows = 6,
         render = { story ->

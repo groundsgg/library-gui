@@ -48,7 +48,7 @@ fun openHoverGui(player: Player) {
             shape.slots.forEach { slot ->
                 button(
                     slot,
-                    item(Material.PAPER) {
+                    item(Material.BUNDLE) {
                         // The name is the tooltip's only line, and it is nothing but markers.
                         name(frame)
                         itemModel = theme.itemModel(DemoTheme.BLANK)
