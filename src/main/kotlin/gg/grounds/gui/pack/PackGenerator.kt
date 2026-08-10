@@ -363,7 +363,12 @@ private fun writeHoverFrames(theme: Theme, assets: Path, out: Path, root: Path) 
             val canvas = wrapped.createGraphics()
             canvas.drawImage(art, 0, 1, null)
             canvas.dispose()
-            val size = (0xFF shl 24) or ((art.width - 1) shl 16) or ((art.height - 1) shl 8)
+            // Blue was zero here and read by nobody; it now says whether this sprite is a meter.
+            val size =
+                (0xFF shl 24) or
+                    ((art.width - 1) shl 16) or
+                    ((art.height - 1) shl 8) or
+                    (frame.meter?.code ?: 0)
             listOf(0, art.height + 1).forEach { row ->
                 wrapped.setRGB(0, row, FRAME_ID_ARGB)
                 wrapped.setRGB(art.width - 1, row, FRAME_ID_ARGB)

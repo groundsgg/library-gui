@@ -32,6 +32,7 @@ fun Theme.frameMarker(
     imageWidth: Int = CONTAINER_WIDTH,
     imageHeight: Int,
     tint: String? = null,
+    tintIndex: Int = paletteIndex(tint),
 ): Component {
     val index = frames.map { it.id }.sorted().indexOf(id)
     require(index >= 0) { "no frame '$id' in theme '$namespace'" }
@@ -53,7 +54,8 @@ fun Theme.frameMarker(
     // Identity comes from pixels inside the sprite, so the whole colour is free to carry the
     // payload: red and green the offset, blue a palette index. Zero leaves the sprite's own colours
     // alone, which is what every marker did before tinting existed.
-    val payload = ((offsetX + 128) shl 16) or ((offsetY + 128) shl 8) or paletteIndex(tint)
+    require(tintIndex in 0..255) { "payload byte is 0..255, got $tintIndex" }
+    val payload = ((offsetX + 128) shl 16) or ((offsetY + 128) shl 8) or tintIndex
     val glyph =
         Component.text(
             String(Character.toChars(FRAME_GLYPH_BASE + index)),
@@ -117,4 +119,37 @@ fun Theme.paletteIndex(tint: String?): Int {
     // packs clients have cached.
     require(index >= 0) { "no colour '$tint' in theme '$namespace'" }
     return index + 1
+}
+
+/**
+ * A marker for the meter [id], filled to [fill] of its length.
+ *
+ * One sprite serves every value. The alternative is a frame per step, and a bar worth looking at
+ * has more steps than a pack wants to carry — a 100px bar would be a hundred sprites to say what a
+ * byte says.
+ *
+ * A meter cannot be tinted: the payload's low byte carries the fill, which is the same byte a tint
+ * would have used. Colour it in the sprite instead, which is where a bar's colour usually belongs
+ * anyway — a gradient along its length costs nothing there and is impossible from a palette index.
+ *
+ * Zero draws nothing at all rather than a stray line of pixels.
+ *
+ * @param fill 0.0 to 1.0; values outside are clamped, because a percentage arriving at 1.02 from
+ *   arithmetic upstream should show a full bar rather than throw at whoever opened the screen
+ */
+fun Theme.meterMarker(
+    id: String,
+    x: Int,
+    y: Int,
+    fill: Double,
+    imageWidth: Int = CONTAINER_WIDTH,
+    imageHeight: Int,
+): Component {
+    val frame = frames.firstOrNull { it.id == id }
+    require(frame != null) { "no frame '$id' in theme '$namespace'" }
+    require(frame.meter != null) {
+        "frame '$id' is not a meter; declare it with frame(\"$id\", ..., meter = ...)"
+    }
+    val step = Math.round(fill.coerceIn(0.0, 1.0) * 255.0).toInt()
+    return frameMarker(id, x, y, imageWidth, imageHeight, tintIndex = step)
 }

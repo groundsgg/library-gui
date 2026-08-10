@@ -239,6 +239,24 @@ fun paintMarket(dumps: Path, out: Path) {
     canvas(16, 16).also { it.blit(loadDump(dumps, "gicon_coins"), 0, 0) }
         .writeSprite(out.resolve("frame/market_coin.png"))
 
+    // The groove, and the bar that fills it. The bar's colour runs along its length rather than
+    // being one tint, which is the point: a meter spends the payload byte a tint would have used,
+    // so its colour has to live in the sprite — and there it can be a gradient for free.
+    val bar = MarketLayout.BAR
+    canvas(bar.width, bar.height).also {
+        it.sunken(0, 0, bar.width, bar.height, 0xFF2A2A2A.toInt(), WELL_INK, WELL_RIM)
+    }
+        .writeSprite(out.resolve("frame/market_track.png"))
+
+    val fill = canvas(bar.width, bar.height)
+    for (column in 0 until bar.width) {
+        val along = column.toDouble() / (bar.width - 1)
+        val red = (0xD8 + (0x5A - 0xD8) * along).toInt()
+        val green = (0x40 + (0xC8 - 0x40) * along).toInt()
+        fill.rect(column, 1, 1, bar.height - 2, 0xFF000000.toInt() or (red shl 16) or (green shl 8) or 0x40)
+    }
+    fill.writeSprite(out.resolve("frame/market_bar.png"))
+
     slotPatches(panel, rows = 6).forEach { (slot, patch) ->
         patch.writeSprite(out.resolve("frame/mk_cover_$slot.png"))
     }

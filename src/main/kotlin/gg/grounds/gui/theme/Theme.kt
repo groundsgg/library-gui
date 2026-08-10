@@ -315,7 +315,19 @@ data class SlotHighlight(val back: String, val front: String) {
  * resource pack and saves that to its options, so test it against a client that has nothing to lose
  * before letting players near it.
  */
-data class Frame(val id: String, val texture: String) {
+/**
+ * Which way a meter fills, if it is one.
+ *
+ * A property of the artwork rather than of the marker: the payload has no room left, and a bar's
+ * axis does not change from one draw to the next anyway. It rides in the spare byte of the size
+ * pixel the sprite already carries, so a meter costs no extra data pixel and no extra width.
+ */
+enum class MeterAxis(internal val code: Int) {
+    HORIZONTAL(1),
+    VERTICAL(2),
+}
+
+data class Frame(val id: String, val texture: String, val meter: MeterAxis? = null) {
     init {
         requireId(id, "frame id")
         requireTexture(texture)
@@ -500,8 +512,8 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
      *
      * [texture] is the outline itself, drawn at its own pixel size and in whatever shape it has.
      */
-    fun frame(id: String, texture: String) {
-        frames += Frame(id, texture)
+    fun frame(id: String, texture: String, meter: MeterAxis? = null) {
+        frames += Frame(id, texture, meter)
     }
 
     /**

@@ -2,6 +2,7 @@ package gg.grounds.gui.demo
 
 import gg.grounds.gui.pack.writePack
 import gg.grounds.gui.pack.zipPack
+import gg.grounds.gui.theme.MeterAxis
 import gg.grounds.gui.theme.PackFormat
 import gg.grounds.gui.theme.TITLE_INSET
 import gg.grounds.gui.theme.Sequence
@@ -193,9 +194,10 @@ object DemoTheme {
             GLYPH_ADVANCES.keys
                 .filter { code -> ART.resolve("frame/glyph_$code.png").exists() }
                 .forEach { code -> frame("glyph_$code", "frame/glyph_$code.png") }
-            listOf("card", "well", "rule", "coin").forEach { part ->
+            listOf("card", "well", "rule", "coin", "track").forEach { part ->
                 frame("market_$part", "frame/market_$part.png")
             }
+            frame("market_bar", "frame/market_bar.png", meter = MeterAxis.HORIZONTAL)
             listOf("plate", "rule", "badge").forEach { part ->
                 frame("dialog_$part", "frame/dialog_$part.png")
             }
