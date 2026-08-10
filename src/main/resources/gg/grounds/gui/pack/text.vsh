@@ -81,8 +81,34 @@ void main() {
 
     if (grounds_data(texel, direction, 0) == GROUNDS_ID) {
         // The sprite states its own size, so the quad is drawn at the artwork's true dimensions
-        // whatever height the font declared it at.
-        vec2 content = vec2(grounds_data(texel, direction, 1).rg) + 1.0;
+        // whatever height the font declared it at. Its third byte was spare and now says whether
+        // this sprite is a meter, and along which axis — a property of the artwork, so it belongs
+        // in the sprite rather than in the payload, which has no room left.
+        ivec3 spec = grounds_data(texel, direction, 1);
+        vec2 content = vec2(spec.rg) + 1.0;
+        int meter = spec.b;
+
+        // A meter spends the payload's low byte on how full it is, so it cannot also be tinted.
+        // One sprite then serves every value: the alternative was shipping a frame per step, and a
+        // bar worth looking at has more steps than a pack wants to carry.
+        vec2 drawn = content;
+        if (meter != 0) {
+            float fill = float(grounds_byte(Color.b)) / 255.0;
+            if (meter == 1) {
+                drawn.x = floor(content.x * fill + 0.5);
+            } else {
+                drawn.y = floor(content.y * fill + 0.5);
+            }
+            // An empty meter draws nothing rather than a stray column of pixels. Put outside the
+            // clip volume with w = 1 rather than collapsed to vec4(0.0), whose perspective divide
+            // is a division by zero and undefined rather than merely invisible.
+            if (drawn.x < 1.0 || drawn.y < 1.0) {
+                gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+                texCoord0 = vec2(0.0);
+                vertexColor = vec4(0.0);
+                return;
+            }
+        }
 
         // ProjMat is the GUI's orthographic matrix: m00 = 2/width, m11 = -2/height. The window
         // stores the ceiling of framebuffer/guiScale, so re-apply it, minus a hair for the round
@@ -96,14 +122,17 @@ void main() {
 
         // Position already arrives in absolute GUI pixels — the tooltip's offset is folded in on
         // the CPU — so absolute coordinates can simply be written over it.
-        gl_Position = ProjMat * ModelViewMat * vec4(origin + corner * content, Position.z, 1.0);
+        gl_Position = ProjMat * ModelViewMat * vec4(origin + corner * drawn, Position.z, 1.0);
         // Crop the data row off whichever horizontal edge this vertex sits on, so it never shows.
-        texCoord0 = UV0 - vec2(0.0, direction.y / texSize.y);
+        vec2 uv = UV0 - vec2(0.0, direction.y / texSize.y);
+        // A partly filled meter reveals part of its artwork rather than squashing all of it, so the
+        // texture is clipped to the drawn size instead of stretched across it.
+        texCoord0 = uv - corner * content / texSize + corner * drawn / texSize;
         // The payload's low byte is a colour index, and it is free because nothing else wanted it:
         // red and green carry the offset, and a marker's identity lives in the sprite's data pixels
         // rather than in its colour. Zero means the sprite keeps the colours it was drawn with,
         // which is what every marker did before this existed.
-        int tint = grounds_byte(Color.b);
+        int tint = meter == 0 ? grounds_byte(Color.b) : 0;
         vertexColor =
             tint == 0
                 ? vec4(1.0)

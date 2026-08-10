@@ -8,6 +8,7 @@ import gg.grounds.gui.theme.chestAnchor
 import gg.grounds.gui.theme.containerHeight
 import gg.grounds.gui.layout.Rect
 import gg.grounds.gui.theme.frameMarker
+import gg.grounds.gui.theme.meterMarker
 import gg.grounds.gui.theme.text
 import gg.grounds.gui.theme.textWidth
 import gg.grounds.gui.theme.title
@@ -56,7 +57,16 @@ private class Offer(
     val name: String,
     val price: Int,
     val note: String,
-)
+) {
+    /**
+     * How much of it is left, as a fraction.
+     *
+     * Derived rather than declared, so the catalogue stays a list of offers rather than a list of
+     * offers and their fixtures. The exact values do not matter; that they differ does.
+     */
+    val stock: Double
+        get() = ((name.length * 37 + price) % 101) / 100.0
+}
 
 /** Twenty-one offers in a twenty-four slot grid, so the trailing tiles show the empty state too. */
 private val CATALOGUE =
@@ -193,6 +203,16 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                             heading(offer.name, offer.note),
                             marker("market_coin", MarketLayout.COIN),
                             line(MarketLayout.PRICE, offer.price.toString(), tint = priceTint(offer.price)),
+                            // The groove first, then the bar clipped to what is left. One sprite
+                            // serves every value — a frame per step would be sixty-eight of them.
+                            marker("market_track", MarketLayout.TRACK),
+                            theme.meterMarker(
+                                "market_bar",
+                                MarketLayout.BAR.x,
+                                MarketLayout.BAR.y,
+                                offer.stock,
+                                imageHeight = height,
+                            ),
                         )
                     )
                     tooltipStyle = theme.tooltipStyle(DemoTheme.BLANK)

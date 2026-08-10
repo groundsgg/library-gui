@@ -62,12 +62,24 @@ object MarketLayout {
 
     val PRICE: Rect = Rect(COIN.x + 18, CARD.y + 33, TEXT.right - (COIN.x + 18), GLYPH_HEIGHT)
 
+    /**
+     * A stock bar, sharing the price's line and filling the space to its right.
+     *
+     * Five pixels tall because it is a readout beside a number, not a headline. Its colour runs
+     * along its own length in the sprite — a thing a palette tint cannot do, since a meter spends
+     * the payload byte a tint would have used.
+     */
+    val BAR: Rect = Rect(PRICE.x + 24, PRICE.y + 1, TEXT.right - (PRICE.x + 24), 5)
+
+    /** The groove behind it, drawn first so an empty bar still reads as a bar. */
+    val TRACK: Rect = BAR
+
     /** Where the resting hint sits when nothing is hovered. */
     val HINT: Rect = Rect(TEXT.x, CARD.centreY - 4, TEXT.width, GLYPH_HEIGHT)
 
     init {
         // Cheap, and it has caught a card that ran into the player's inventory once already.
-        listOf(PREVIEW_WELL, TEXT, NAME, RULE, NOTE, COIN, PRICE, HINT).forEach { part ->
+        listOf(PREVIEW_WELL, TEXT, NAME, RULE, NOTE, COIN, PRICE, BAR, HINT).forEach { part ->
             require(part in CARD) { "$part escapes the card $CARD" }
         }
     }
