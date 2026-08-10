@@ -1,5 +1,6 @@
 package gg.grounds.gui.demo.art
 
+import gg.grounds.gui.art.crop
 import gg.grounds.gui.art.nineSlice
 import gg.grounds.gui.layout.slotWellX
 import gg.grounds.gui.layout.slotWellY
@@ -28,6 +29,11 @@ data class MenuButton(
     val width: Int = 18 * (c1 - c0 + 1)
     val height: Int = 18 * (r1 - r0 + 1)
 }
+
+/** Vanilla's button border, and a middle wide enough for the widest button a container fits. */
+const val MENU_CAP: Int = 3
+
+const val MENU_MIDDLE: Int = 170
 
 val MENU_BUTTONS: List<MenuButton> =
     listOf(
@@ -70,9 +76,21 @@ fun paintMenu(dumps: Path, out: Path) {
 
     // Layer 1 of the hover stack: the highlighted button, fully opaque, so it covers vanilla's
     // single-slot highlight box wherever the cursor lands inside a multi-slot button.
-    listOf("small" to 54, "wide" to 126).forEach { (name, width) ->
-        highlighted.nineSlice(width, 18, 3).writeSprite(out.resolve("frame/menu_face_$name.png"))
-    }
+    //
+    // Three sprites rather than one per width. They are cut from a single nine-sliced render, so
+    // the caps and the middle band are exactly what the client's own nine-slice would have
+    // produced — the runtime then clips the middle to whatever span a button needs.
+    val lit = highlighted.nineSlice(2 * MENU_CAP + MENU_MIDDLE, 18, 3)
+
+    // A cap is three pixels wide and a frame needs four for its own data row, so each is padded
+    // with a transparent column on the right. The visible edge stays three wide and the middle
+    // still starts one cap in — the padding overlaps it and draws nothing.
+    fun cap(from: Int) =
+        canvas(MENU_CAP + 1, 18).also { it.blit(lit.crop(from, 0, MENU_CAP, 18), 0, 0) }
+
+    cap(0).writeSprite(out.resolve("frame/menu_face_left.png"))
+    lit.crop(MENU_CAP, 0, MENU_MIDDLE, 18).writeSprite(out.resolve("frame/menu_face_middle.png"))
+    cap(MENU_CAP + MENU_MIDDLE).writeSprite(out.resolve("frame/menu_face_right.png"))
 
     // Layer 2: the label again, because layer 1 just painted over it. Same glyphs, same place.
     MENU_BUTTONS.forEach { button ->

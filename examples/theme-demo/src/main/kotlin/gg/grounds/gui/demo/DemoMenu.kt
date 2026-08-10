@@ -5,6 +5,7 @@ import gg.grounds.gui.item
 import gg.grounds.gui.theme.Theme
 import gg.grounds.gui.theme.containerHeight
 import gg.grounds.gui.theme.frameMarker
+import gg.grounds.gui.theme.sliceMarkers
 import gg.grounds.gui.theme.title
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.sound.Sound
@@ -126,10 +127,13 @@ fun openMenu(player: Player) {
                     // button rectangle, so a patch inside it cannot change a pixel. Empty slots
                     // still need one, because there is no face there to do the covering.
                     .append(
-                        theme.frameMarker(
-                            "menu_face_${menuButton.frame}",
+                        // Whatever width this button happens to span. It used to be a sprite per
+                        // width, so a button of a size nobody had anticipated meant a new asset.
+                        theme.sliceMarkers(
+                            MENU_FACE,
                             menuButton.x,
                             menuButton.y,
+                            menuButton.width,
                             imageHeight = height,
                         )
                     )

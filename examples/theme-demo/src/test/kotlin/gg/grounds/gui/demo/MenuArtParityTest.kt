@@ -86,8 +86,9 @@ class MenuArtParityTest {
 
         listOf(
             "panels/menu.png",
-            "frame/menu_face_small.png",
-            "frame/menu_face_wide.png",
+            "frame/menu_face_left.png",
+            "frame/menu_face_middle.png",
+            "frame/menu_face_right.png",
             "frame/menu_label_shop.png",
             "frame/menu_label_play.png",
             "frame/menu_label_profile.png",

@@ -2,6 +2,8 @@ package gg.grounds.gui.demo
 
 import gg.grounds.gui.pack.writePack
 import gg.grounds.gui.pack.zipPack
+import gg.grounds.gui.demo.art.MENU_CAP
+import gg.grounds.gui.demo.art.MENU_MIDDLE
 import gg.grounds.gui.theme.MeterAxis
 import gg.grounds.gui.theme.PackFormat
 import gg.grounds.gui.theme.TITLE_INSET
@@ -19,6 +21,9 @@ internal val ART: Path = Path.of("art")
 
 /** The one character set. Colour is chosen per marker, so one family covers every weight. */
 internal const val GLYPHS: String = "ascii"
+
+/** The menu's button face, drawable at any width from three sprites. */
+internal const val MENU_FACE: String = "menu_face"
 
 /** Supporting text on the card: present, clearly not the headline. */
 internal const val DIM: String = "dim"
@@ -221,9 +226,16 @@ object DemoTheme {
                 frame("ov_icon_$name", "frame/ov_icon_$name.png")
                 frame("ov_outline_$name", "frame/ov_outline_$name.png")
             }
-            listOf("small", "wide").forEach { size ->
-                frame("menu_face_$size", "frame/menu_face_$size.png")
-            }
+            listOf("left", "right").forEach { end -> frame("menu_face_$end", "frame/menu_face_$end.png") }
+            frame("menu_face_middle", "frame/menu_face_middle.png", meter = MeterAxis.HORIZONTAL)
+            slice(
+                MENU_FACE,
+                left = "menu_face_left",
+                middle = "menu_face_middle",
+                right = "menu_face_right",
+                capWidth = MENU_CAP,
+                middleWidth = MENU_MIDDLE,
+            )
             listOf("shop", "kits", "play", "settings", "profile").forEach { id ->
                 frame("menu_label_$id", "frame/menu_label_$id.png")
             }

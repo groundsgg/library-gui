@@ -168,6 +168,41 @@ data class GlyphSet(val id: String, val framePrefix: String, val advances: Map<I
 }
 
 /**
+ * A control that can be drawn at any width from three sprites.
+ *
+ * A button spanning seven slots used to be its own PNG, and so did one spanning three: a sprite per
+ * width, decided when the pack was built, and a width nobody anticipated meant a new asset. Three
+ * frames replace all of them — two caps and a middle that is a horizontal meter, drawn clipped to
+ * exactly the span wanted.
+ *
+ * Only the horizontal case, deliberately. A vertical one is the same idea rotated and has had no
+ * caller; adding it on the chance that one appears is how an API grows things nobody uses.
+ *
+ * @param capWidth how much of each end is copied one to one, the way a nine-slice border is
+ * @param middleWidth the middle sprite's own width, and therefore the widest span it can cover
+ */
+data class Slice(
+    val id: String,
+    val left: String,
+    val middle: String,
+    val right: String,
+    val capWidth: Int,
+    val middleWidth: Int,
+) {
+    init {
+        requireId(id, "slice id")
+        require(capWidth > 0) { "slice '$id' needs a cap, got $capWidth" }
+        // The shader reads a sprite's width from a byte, so nothing wider than this exists anyway —
+        // and it is also what guarantees every span is reachable exactly. See sliceMarkers.
+        require(middleWidth in 1..255) { "slice '$id' middle is ${middleWidth}px, must be 1..255" }
+    }
+
+    /** The widest control these three sprites can draw. */
+    val maxWidth: Int
+        get() = 2 * capWidth + middleWidth
+}
+
+/**
  * A background image drawn behind a GUI.
  *
  * The client gives a server no way to draw into a container window, so the image rides in as a font
@@ -354,6 +389,7 @@ data class Theme(
     val bundleFiller: Boolean = false,
     val frames: List<Frame> = emptyList(),
     val glyphSets: List<GlyphSet> = emptyList(),
+    val slices: List<Slice> = emptyList(),
     val colours: List<ThemeColour> = emptyList(),
 ) {
     private val glyphs: Map<String, String>
@@ -367,6 +403,7 @@ data class Theme(
         requireDistinct(tooltips.map { it.id }, "tooltip")
         requireDistinct(frames.map { it.id }, "frame")
         requireDistinct(glyphSets.map { it.id }, "glyph set")
+        requireDistinct(slices.map { it.id }, "slice")
         requireDistinct(colours.map { it.name }, "colour")
         require(colours.size <= PALETTE_CAPACITY) {
             "${colours.size} colours exceed the $PALETTE_CAPACITY a payload byte can index"
@@ -527,6 +564,18 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
         glyphSets += GlyphSet(id, framePrefix, advances)
     }
 
+    /** Declares a control drawable at any width; see [Slice]. */
+    fun slice(
+        id: String,
+        left: String,
+        middle: String,
+        right: String,
+        capWidth: Int,
+        middleWidth: Int,
+    ) {
+        slices += Slice(id, left, middle, right, capWidth, middleWidth)
+    }
+
     /** Declares a colour markers can be tinted with; see [ThemeColour]. */
     fun colour(name: String, rgb: Int) {
         colours += ThemeColour(name, rgb)
@@ -534,6 +583,7 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
 
     private val frames = mutableListOf<Frame>()
     private val glyphSets = mutableListOf<GlyphSet>()
+    private val slices = mutableListOf<Slice>()
     private val colours = mutableListOf<ThemeColour>()
 
     /** Builds the theme, validating ids, sizes and glyph budget. */
@@ -550,6 +600,7 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
             bundles,
             frames.toList(),
             glyphSets.toList(),
+            slices.toList(),
             colours.toList(),
         )
 }
