@@ -1,7 +1,11 @@
 package gg.grounds.gui.demo.art
 
+import gg.grounds.gui.art.hitSlots
 import gg.grounds.gui.art.writeSprite
+import java.awt.image.BufferedImage
 import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.writeText
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.pow
@@ -129,7 +133,7 @@ fun paintFrames(out: Path) {
  * Apex at the top centre, base along the bottom. Lit on the left slope and along the top, shadowed
  * on the right and at the base — the same light direction as the button's bevel.
  */
-private fun paintTriangle(panel: java.awt.image.BufferedImage) {
+private fun paintTriangle(panel: BufferedImage) {
     val apexX = (TRI[0] + TRI[2]) / 2.0
     val height = (TRI[3] - TRI[1]).toDouble()
     for (y in TRI[1] until TRI[3]) {
@@ -160,19 +164,39 @@ fun paintShop(out: Path) {
     val panel = window(PANEL_WIDTH, height)
     panel.playerWells(height)
 
-    // One raised button covering a 3x3 block of slots, drawn entirely in the panel so it ignores
-    // the slot grid the way a real multi-slot control would.
-    panel.bevel(
-        SHAPE[0] - 2,
-        SHAPE[1] - 2,
-        SHAPE[2] - SHAPE[0] + 4,
-        SHAPE[3] - SHAPE[1] + 4,
-        BUTTON_FACE,
-        GUI_LIGHT,
-        GUI_SHADOW,
-    )
-    paintTriangle(panel)
+    // Each shape is drawn onto a transparent mask of its own, then blitted into the panel and
+    // measured for the slots it covers. One drawing serves both, so the artwork and the hit area
+    // cannot drift — the triangle's slots used to be read off by eye and written down beside it.
+    val masks =
+        mapOf(
+            "square" to
+                canvas(PANEL_WIDTH, height).also {
+                    // One raised button covering a 3x3 block, drawn ignoring the slot grid the way
+                    // a real multi-slot control would.
+                    it.bevel(
+                        SHAPE[0] - 2,
+                        SHAPE[1] - 2,
+                        SHAPE[2] - SHAPE[0] + 4,
+                        SHAPE[3] - SHAPE[1] + 4,
+                        BUTTON_FACE,
+                        GUI_LIGHT,
+                        GUI_SHADOW,
+                    )
+                },
+            "triangle" to canvas(PANEL_WIDTH, height).also(::paintTriangle),
+        )
+    masks.values.forEach { panel.blit(it, 0, 0) }
     panel.writeSprite(out.resolve("panels/shop.png"))
+
+    // The measurement travels with the artwork, the way the glyph advances do.
+    out.resolve("frame/shapes.properties")
+        .also { it.parent.createDirectories() }
+        .writeText(
+            "# shape=slots it covers, derived from the artwork's own alpha\n" +
+                masks.entries.joinToString("") { (name, mask) ->
+                    "$name=${hitSlots(mask, rows = 3).joinToString(",")}\n"
+                }
+        )
 }
 
 fun paintCoin(out: Path) {

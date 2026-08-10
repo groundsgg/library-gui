@@ -72,6 +72,23 @@ internal val GLYPH_ADVANCES: Map<Int, Int> by lazy {
 }
 
 /**
+ * The slots each painted shape covers, measured by the painter off the artwork's own alpha.
+ *
+ * Same discipline as the glyph advances: the side holding the pixels does the measuring, and what
+ * reaches here is what it found.
+ */
+internal val SHAPE_SLOTS: Map<String, List<Int>> by lazy {
+    val table = Properties()
+    ART.resolve("frame/shapes.properties").inputStream().use(table::load)
+    table.entries.associate { (key, value) ->
+        key.toString() to value.toString().split(",").filter(String::isNotBlank).map(String::toInt)
+    }
+}
+
+private fun shapeSlots(name: String): List<Int> =
+    SHAPE_SLOTS[name] ?: error("no hit area for '$name'; run :examples:theme-demo:paintArt")
+
+/**
  * The demo's theme, with the three title offsets left mutable so they can be dialled in against a
  * running client — which is the only way to settle them, since they are conventions taken from how
  * vanilla lays a container title out and nothing here has ever been measured.
@@ -260,13 +277,19 @@ object DemoTheme {
         val cornerTo: Int,
     )
 
-    /** The square button covers columns 3..5 of every row; the triangle stands to its left. */
+    /**
+     * The square button covers columns 3..5 of every row; the triangle stands to its left.
+     *
+     * Their slots are read back from what the painter measured off the artwork's own alpha, not
+     * written down here. They used to be: the triangle carried `listOf(1, 10, 18, 19, 20)` beside
+     * the code that drew it, and redrawing the shape would have left a slot lighting up nothing and
+     * a slot lighting up from nowhere, with nothing to say so. The derived lists came back
+     * identical to the hand-written ones, which is the nicest way to find out a list was right.
+     */
     val SHAPES: List<Shape> =
         listOf(
-            Shape("square", listOf(3, 4, 5, 12, 13, 14, 21, 22, 23), 3, 23),
-            // Only the slots whose centres fall inside the triangle: one at the apex, one in the
-            // middle, three along the base.
-            Shape("triangle", listOf(1, 10, 18, 19, 20), 0, 20),
+            Shape("square", shapeSlots("square"), 3, 23),
+            Shape("triangle", shapeSlots("triangle"), 0, 20),
         )
 
     /**

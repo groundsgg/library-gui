@@ -356,3 +356,38 @@ fun cutGlyphs(
     }
     return GlyphCut(sprites, advances)
 }
+
+/**
+ * The slots [mask] actually covers, as slot indices.
+ *
+ * A control that is not a rectangle has a hit area smaller than its bounding block, and until now
+ * that list was read off the artwork by eye and written down: the demo's triangle carried
+ * `listOf(1, 10, 18, 19, 20)` next to the code that drew it. Nothing tied the two together, so
+ * redrawing the shape left a slot that lights up nothing and a slot that lights up from nowhere.
+ *
+ * [mask] is the shape alone on a transparent canvas, in window coordinates — not the finished
+ * panel, where every pixel is opaque and every slot would qualify.
+ *
+ * @param coverage the share of a slot's item area that has to be covered for the slot to count.
+ *   Half is a deliberate default: it means a slot belongs to whatever the cursor is mostly over,
+ *   which is the judgement a player makes by eye.
+ */
+fun hitSlots(mask: BufferedImage, rows: Int, coverage: Double = 0.5): List<Int> {
+    require(rows in 1..6) { "a chest has 1..6 rows, got $rows" }
+    require(coverage > 0.0 && coverage <= 1.0) { "coverage is a share above 0 and up to 1" }
+    val needed = Math.ceil(coverage * ITEM_AREA * ITEM_AREA).toInt()
+    return (0 until rows * 9).filter { slot ->
+        val area = Rect.slot(slot)
+        if (area.right > mask.width || area.bottom > mask.height) {
+            false
+        } else {
+            var covered = 0
+            for (row in 0 until area.height) {
+                for (column in 0 until area.width) {
+                    if (mask.getRGB(area.x + column, area.y + row) ushr 24 != 0) covered++
+                }
+            }
+            covered >= needed
+        }
+    }
+}
