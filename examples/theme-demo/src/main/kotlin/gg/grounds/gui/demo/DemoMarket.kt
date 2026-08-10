@@ -149,8 +149,8 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
 
     fun marker(id: String, x: Int, y: Int) = theme.frameMarker(id, x, y, imageHeight = height)
 
-    fun line(set: String, x: Int, y: Int, body: String) =
-        theme.text(set, x, y, theme.fit(set, body, TEXT_RIGHT - x), imageHeight = height)
+    fun line(x: Int, y: Int, body: String, tint: String? = null) =
+        theme.text(GLYPHS, x, y, theme.fit(GLYPHS, body, TEXT_RIGHT - x), imageHeight = height, tint = tint)
 
     /**
      * The card, rewritten from scratch on every hover.
@@ -168,9 +168,9 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
     /** A heading and a supporting line, the shape every card on this screen uses. */
     fun heading(title: String, note: String) =
         Component.empty()
-            .append(line(GLYPHS, TEXT_X, NAME_Y, title))
+            .append(line(TEXT_X, NAME_Y, title))
             .append(marker("market_rule", TEXT_X, RULE_Y))
-            .append(line(GLYPHS_DIM, TEXT_X, NOTE_Y, note))
+            .append(line(TEXT_X, NOTE_Y, note, tint = DIM))
 
     gui(player, theme.title("market", Component.empty(), chestAnchor(ROWS)), rows = ROWS) {
         matches.take(GRID_SLOTS.size).forEachIndexed { index, offer ->
@@ -185,7 +185,7 @@ fun openMarket(player: Player, query: String = queries[player.uuid].orEmpty()) {
                             marker("market_item_${offer.texture}", PREVIEW_X, PREVIEW_Y),
                             heading(offer.name, offer.note),
                             marker("market_coin", TEXT_X - 1, COIN_Y),
-                            line(GLYPHS, PRICE_X, PRICE_Y, offer.price.toString()),
+                            line(PRICE_X, PRICE_Y, offer.price.toString(), tint = GOLD),
                         )
                     )
                     tooltipStyle = theme.tooltipStyle(DemoTheme.BLANK)

@@ -119,6 +119,33 @@ const val FRAME_CAPACITY: Int = FRAME_SPACE_BASE - FRAME_GLYPH_BASE
 const val FRAME_MARKER_RED: Int = 0xFE
 
 /**
+ * How many colours a theme can declare.
+ *
+ * The index rides in the payload's low byte and zero is reserved for "leave the sprite alone", so
+ * 255 remain. Nothing about the mechanism wants that many; the cap exists to fail on the ridiculous
+ * rather than to silently wrap.
+ */
+const val PALETTE_CAPACITY: Int = 255
+
+/**
+ * A colour a marker can be tinted with.
+ *
+ * Markers looked untintable for a long time, and the second glyph family in the demo exists because
+ * of that reading. It was wrong: the payload's red and green carry the offset, a marker's identity
+ * lives in its sprite's data pixels, and the blue byte was written as zero and read by nobody. So
+ * it carries a palette index, the generator writes the palette into the shader, and one sprite
+ * serves every colour instead of one family per colour.
+ *
+ * @param rgb 0xRRGGBB; the alpha the sprite was drawn with is kept
+ */
+data class ThemeColour(val name: String, val rgb: Int) {
+    init {
+        requireId(name, "colour name")
+        require(rgb in 0..0xFFFFFF) { "colour '$name' must be 0xRRGGBB, got ${rgb.toString(16)}" }
+    }
+}
+
+/**
  * A proportional character set whose glyphs are hover frames, one per codepoint.
  *
  * A label painted into a panel is fixed when the pack is built, which is all a button that always
@@ -315,6 +342,7 @@ data class Theme(
     val bundleFiller: Boolean = false,
     val frames: List<Frame> = emptyList(),
     val glyphSets: List<GlyphSet> = emptyList(),
+    val colours: List<ThemeColour> = emptyList(),
 ) {
     private val glyphs: Map<String, String>
     private val panelsById: Map<String, Panel>
@@ -327,6 +355,10 @@ data class Theme(
         requireDistinct(tooltips.map { it.id }, "tooltip")
         requireDistinct(frames.map { it.id }, "frame")
         requireDistinct(glyphSets.map { it.id }, "glyph set")
+        requireDistinct(colours.map { it.name }, "colour")
+        require(colours.size <= PALETTE_CAPACITY) {
+            "${colours.size} colours exceed the $PALETTE_CAPACITY a payload byte can index"
+        }
         // Past this the frame block runs into the space block that cancels its advance, and every
         // frame from there on renders as a space instead of as artwork. Nothing about that failure
         // is visible — no log line, no missing file, just a hover that draws nothing — so it has to
@@ -483,8 +515,14 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
         glyphSets += GlyphSet(id, framePrefix, advances)
     }
 
+    /** Declares a colour markers can be tinted with; see [ThemeColour]. */
+    fun colour(name: String, rgb: Int) {
+        colours += ThemeColour(name, rgb)
+    }
+
     private val frames = mutableListOf<Frame>()
     private val glyphSets = mutableListOf<GlyphSet>()
+    private val colours = mutableListOf<ThemeColour>()
 
     /** Builds the theme, validating ids, sizes and glyph budget. */
     fun build(): Theme =
@@ -500,5 +538,6 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
             bundles,
             frames.toList(),
             glyphSets.toList(),
+            colours.toList(),
         )
 }

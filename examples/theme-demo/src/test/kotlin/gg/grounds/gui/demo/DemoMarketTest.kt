@@ -35,11 +35,11 @@ class DemoMarketTest {
      * on a missing glyph — which is the library being right and the test being wrong.
      */
     @Test
-    fun `both glyph families cover every printable character`() {
+    fun `the glyph set covers every printable character, in every tint`() {
         val theme = DemoTheme.current()
-        listOf(GLYPHS, GLYPHS_DIM).forEach { set ->
+        listOf(null, DIM, GOLD).forEach { tint ->
             (32..126).forEach { code ->
-                theme.text(set, 8, 18, code.toChar().toString(), imageHeight = height)
+                theme.text(GLYPHS, 8, 18, code.toChar().toString(), imageHeight = height, tint = tint)
             }
         }
     }

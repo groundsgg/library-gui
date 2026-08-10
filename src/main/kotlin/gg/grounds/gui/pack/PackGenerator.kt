@@ -305,6 +305,32 @@ private val FRAME_ID_ARGB = (0xFF shl 24) or (0xFE shl 16) or (0x4E shl 8) or 0x
  * Cancelling the advance matters because the markers ride inside a real tooltip: a glyph that
  * consumed width would widen that tooltip for no visible reason.
  */
+/**
+ * Substitutes the theme's declared colours into the shader's palette.
+ *
+ * The bundled source carries a one-entry placeholder so it stays valid GLSL on its own — a shipped
+ * pack always gets the real thing, and a theme that declares nothing keeps the placeholder, which
+ * is harmless because nothing can then ask for a tint.
+ */
+private fun withPalette(source: String, theme: Theme): String {
+    if (theme.colours.isEmpty()) return source
+    val entries =
+        theme.colours
+            .sortedBy { it.name }
+            .joinToString(", ") { colour ->
+                val (r, g, b) = listOf(16, 8, 0).map { shift -> (colour.rgb shr shift) and 0xFF }
+                "vec3(%.5f, %.5f, %.5f)".format(r / 255.0, g / 255.0, b / 255.0)
+            }
+    val size = theme.colours.size
+    val replaced =
+        source.replace(
+            "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));",
+            "const vec3 GROUNDS_PALETTE[$size] = vec3[$size]($entries);",
+        )
+    check(replaced != source) { "the bundled text.vsh no longer carries the palette placeholder" }
+    return replaced
+}
+
 private fun writeHoverFrames(theme: Theme, assets: Path, out: Path, root: Path) {
     val shader =
         checkNotNull(object {}.javaClass.getResourceAsStream("/gg/grounds/gui/pack/text.vsh")) {
@@ -312,7 +338,7 @@ private fun writeHoverFrames(theme: Theme, assets: Path, out: Path, root: Path) 
         }
     (out / "assets" / "minecraft" / "shaders" / "core").createDirectories()
     (out / "assets" / "minecraft" / "shaders" / "core" / "text.vsh").writeText(
-        shader.bufferedReader().use { it.readText() }
+        withPalette(shader.bufferedReader().use { it.readText() }, theme)
     )
 
     val providers = mutableListOf<String>()

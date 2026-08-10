@@ -18,6 +18,8 @@ import net.kyori.adventure.text.Component
  * A twenty-character line is forty codepoints in a string nobody reads.
  *
  * @param glyphSetId a set declared with `glyphs(...)` on the theme
+ * @param tint a colour declared with `colour(...)`, or null to keep the glyphs' own. One set drawn
+ *   in several colours is why this exists — the alternative was a whole family per colour.
  * @throws IllegalArgumentException if the set does not exist, or if [text] contains a character the
  *   set has no advance for. Loud on purpose: the alternative is a line that silently renders short.
  */
@@ -28,6 +30,7 @@ fun Theme.text(
     text: String,
     imageWidth: Int = CONTAINER_WIDTH,
     imageHeight: Int,
+    tint: String? = null,
 ): Component {
     val set = glyphSet(glyphSetId)
     val frames = frames.mapTo(HashSet()) { it.id }
@@ -40,7 +43,7 @@ fun Theme.text(
         // Checking the frames rather than assuming keeps a missing sprite from being mistaken for
         // one, which would leave a hole in the middle of a word and no clue why.
         if (frame in frames) {
-            out = out.append(frameMarker(frame, pen, y, imageWidth, imageHeight))
+            out = out.append(frameMarker(frame, pen, y, imageWidth, imageHeight, tint))
         }
         pen += advance
     }

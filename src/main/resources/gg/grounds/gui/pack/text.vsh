@@ -47,6 +47,10 @@ uniform sampler2D Sampler0;
 // channel intensity, so a sheet can never produce this triple by accident.
 const ivec3 GROUNDS_ID = ivec3(0xFE, 0x4E, 0x2A);
 
+// The theme's declared colours, substituted by the pack generator. The literal below is a
+// placeholder so this file stays valid GLSL on its own; a shipped pack always carries the real one.
+const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));
+
 int grounds_byte(float channel) {
     // UNORM8 to float is b/255 correctly rounded, so this recovers b exactly for all 256 values.
     return int(channel * 255.0 + 0.5);
@@ -95,8 +99,15 @@ void main() {
         gl_Position = ProjMat * ModelViewMat * vec4(origin + corner * content, Position.z, 1.0);
         // Crop the data row off whichever horizontal edge this vertex sits on, so it never shows.
         texCoord0 = UV0 - vec2(0.0, direction.y / texSize.y);
-        // Drop the payload before it can tint anything; the sprite carries the colour.
-        vertexColor = vec4(1.0);
+        // The payload's low byte is a colour index, and it is free because nothing else wanted it:
+        // red and green carry the offset, and a marker's identity lives in the sprite's data pixels
+        // rather than in its colour. Zero means the sprite keeps the colours it was drawn with,
+        // which is what every marker did before this existed.
+        int tint = grounds_byte(Color.b);
+        vertexColor =
+            tint == 0
+                ? vec4(1.0)
+                : vec4(GROUNDS_PALETTE[clamp(tint - 1, 0, GROUNDS_PALETTE.length() - 1)], 1.0);
         return;
     }
 #endif

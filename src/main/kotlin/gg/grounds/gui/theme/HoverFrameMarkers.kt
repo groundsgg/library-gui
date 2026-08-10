@@ -31,6 +31,7 @@ fun Theme.frameMarker(
     y: Int,
     imageWidth: Int = CONTAINER_WIDTH,
     imageHeight: Int,
+    tint: String? = null,
 ): Component {
     val index = frames.map { it.id }.sorted().indexOf(id)
     require(index >= 0) { "no frame '$id' in theme '$namespace'" }
@@ -49,8 +50,10 @@ fun Theme.frameMarker(
     }
 
     val font = Key.key(namespace, "hoverframe")
-    // Identity comes from pixels inside the sprite, so the whole colour is free to carry position.
-    val payload = ((offsetX + 128) shl 16) or ((offsetY + 128) shl 8)
+    // Identity comes from pixels inside the sprite, so the whole colour is free to carry the
+    // payload: red and green the offset, blue a palette index. Zero leaves the sprite's own colours
+    // alone, which is what every marker did before tinting existed.
+    val payload = ((offsetX + 128) shl 16) or ((offsetY + 128) shl 8) or paletteIndex(tint)
     val glyph =
         Component.text(
             String(Character.toChars(FRAME_GLYPH_BASE + index)),
@@ -104,4 +107,14 @@ fun Theme.chestFrame(
         y = 18 + 18 * lines.min() - outset,
         imageHeight = containerHeight(rows),
     )
+}
+
+/** Position of [tint] in the theme's palette, one-based; 0 when no tint was asked for. */
+fun Theme.paletteIndex(tint: String?): Int {
+    if (tint == null) return 0
+    val index = colours.map { it.name }.sorted().indexOf(tint)
+    // Sorted, for the reason frames are: declaring a colour must not renumber the ones already in
+    // packs clients have cached.
+    require(index >= 0) { "no colour '$tint' in theme '$namespace'" }
+    return index + 1
 }

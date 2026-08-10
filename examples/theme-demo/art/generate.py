@@ -520,14 +520,13 @@ def glyph_frames():
         # so it draws where it always did, and the extra columns are transparent.
         width = max(max(x for x, _, _ in pixels) + 1, 4)
         height = max(y for _, y, _ in pixels) + 1
-        # Two families, because a marker cannot be tinted at runtime — its colour channel carries
-        # the position payload, so the only colour a glyph will ever have is the one baked in. A
-        # card without a second weight has no hierarchy at all: everything shouts equally.
-        for prefix, colour in (("glyph_", WHITE), ("glyphdim_", TEXT_DIM)):
-            glyph = Canvas(width, height)
-            for gx, gy, _ in pixels:
-                glyph.set(gx, gy, colour)
-            glyph.write(HERE / "frame" / f"{prefix}{code}.png")
+        # One family, drawn white. A second one used to exist for the card's muted line, back when
+        # a marker looked untintable; the payload's low byte turned out to be free, so the colour
+        # is chosen per marker now and white multiplies cleanly by whatever the palette says.
+        glyph = Canvas(width, height)
+        for gx, gy, _ in pixels:
+            glyph.set(gx, gy, WHITE)
+        glyph.write(HERE / "frame" / f"glyph_{code}.png")
 
     table = HERE / "frame" / "glyphs.properties"
     table.write_text(

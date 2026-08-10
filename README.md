@@ -264,12 +264,61 @@ every ordinary slot, the one exception is a client-side class the server never
 selects, and the client never tells the server what the cursor is over. The
 choice is the effect everywhere or nowhere.
 
-Anything past those two — a highlight on one specific slot, an icon that follows
-the cursor — needs a core shader override in the pack, and shaders are per
-Minecraft version. That is deliberately not in here.
-
 Clients that never load the pack see a plain vanilla GUI: the label alone, and
 items in their material's own model. Nothing breaks, it just looks ordinary.
+
+### Markers: what the pack format cannot express
+
+Everything above is what the pack format offers on its own. Past it — an outline
+over one specific slot, a description that stays where the layout put it, a price
+no pack could know — needs a core shader override, and the library ships one.
+
+A marker is a glyph carried in an item's tooltip. The client renders a tooltip
+only for the slot under the cursor and only for that slot's own item, so a glyph
+riding there is already hover-scoped and item-scoped without the server ever
+learning where the cursor is. The shader recognises it by pixels inside its own
+sprite and redraws it somewhere else entirely:
+
+```kotlin
+frame("outline", "frame/outline.png")
+```
+```kotlin
+name(theme.frameMarker("outline", x = 7, y = 17, imageHeight = containerHeight(6)))
+```
+
+Markers draw in the order they are appended, which is what makes layering work:
+a patch that hides vanilla's hover box, then artwork, then a label over it.
+
+Position rides in the glyph's colour as two signed bytes measured from the
+window's centre, so a marker draws within ±128px of it and no further. A panel
+floating beside the window is not reachable, and asking for one fails rather than
+landing somewhere unintended.
+
+#### Text, and colour
+
+A glyph set is one frame per character, which turns text into something the
+server composes at render time rather than something the pack decides:
+
+```kotlin
+colour("dim", 0x969AA4)
+glyphs("ascii", "glyph_", advances)
+```
+```kotlin
+theme.text("ascii", x = 54, y = 98, "Sharpness III", imageHeight = height, tint = "dim")
+```
+
+`advances` maps codepoint to pen advance and has to come from wherever the glyphs
+were cut — the sheet is proportional, and a second copy of those widths is the
+kind that drifts a pixel at a time.
+
+`tint` names a declared colour. It exists because the payload's low byte was
+free: red and green carry the offset, a marker's identity is in its sprite, and
+nothing read blue. So one white glyph set covers every weight, instead of one
+family per colour. The shader multiplies, so tinting is exact on white or
+greyscale artwork and darkens anything already coloured.
+
+The shader is per Minecraft version — 26.2 renamed `rendertype_text` to `text`,
+and a pack aimed at the wrong one overrides nothing at all, silently.
 
 ## Behavior notes
 

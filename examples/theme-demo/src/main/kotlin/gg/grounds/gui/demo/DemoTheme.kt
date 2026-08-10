@@ -15,16 +15,14 @@ import kotlin.io.path.inputStream
 /** Where the demo's artwork lives, relative to the module the server is started from. */
 internal val ART: Path = Path.of("art")
 
-/** The bright character set, for anything that is the point of a line. */
+/** The one character set. Colour is chosen per marker, so one family covers every weight. */
 internal const val GLYPHS: String = "ascii"
 
-/**
- * The muted one, for anything supporting it.
- *
- * Two families rather than one tinted at runtime, because a marker's colour channel is spent on its
- * position payload — the only colour a glyph will ever have is the one baked into the sprite.
- */
-internal const val GLYPHS_DIM: String = "ascii_dim"
+/** Supporting text on the card: present, clearly not the headline. */
+internal const val DIM: String = "dim"
+
+/** The price, so a number that costs something reads like one. */
+internal const val GOLD: String = "gold"
 
 /**
  * Codepoint to pen advance, read back from what the generator measured.
@@ -156,12 +154,12 @@ object DemoTheme {
             panel("market", "panels/market.png", 176, 222)
             // One frame per drawable character, so text can be composed at runtime. A codepoint
             // with an advance but no PNG is a blank — the space — and gets no frame on purpose.
-            listOf(GLYPHS to "glyph_", GLYPHS_DIM to "glyphdim_").forEach { (set, prefix) ->
-                glyphs(set, prefix, GLYPH_ADVANCES)
-                GLYPH_ADVANCES.keys
-                    .filter { code -> ART.resolve("frame/$prefix$code.png").exists() }
-                    .forEach { code -> frame("$prefix$code", "frame/$prefix$code.png") }
-            }
+            colour(DIM, 0x969AA4)
+            colour(GOLD, 0xFFC24A)
+            glyphs(GLYPHS, "glyph_", GLYPH_ADVANCES)
+            GLYPH_ADVANCES.keys
+                .filter { code -> ART.resolve("frame/glyph_$code.png").exists() }
+                .forEach { code -> frame("glyph_$code", "frame/glyph_$code.png") }
             listOf("card", "well", "rule", "coin").forEach { part ->
                 frame("market_$part", "frame/market_$part.png")
             }
