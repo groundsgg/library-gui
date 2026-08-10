@@ -2,6 +2,7 @@ package gg.grounds.gui
 
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
+import net.minestom.server.component.DataComponent
 import net.minestom.server.component.DataComponents
 import net.minestom.server.entity.Player
 import net.minestom.server.entity.PlayerSkin
@@ -60,6 +61,19 @@ class ItemBuilder(private val material: Material) {
 
     private var name: Component? = null
     private val lore = mutableListOf<Component>()
+    private val components = mutableListOf<(ItemStack) -> ItemStack>()
+
+    /**
+     * Sets any item component the properties above do not cover.
+     *
+     * The named ones are named because they are what a themed GUI reaches for constantly.
+     * Everything else in the game's component set is still an item component, and a builder that
+     * could not express them meant dropping out of the DSL entirely to set one — `MAP_ID`, say,
+     * without which a filled map is a blank sheet.
+     */
+    fun <T : Any> component(component: DataComponent<T>, value: T) {
+        components += { stack -> stack.with(component, value) }
+    }
 
     fun name(name: Component) {
         this.name = name
@@ -83,6 +97,7 @@ class ItemBuilder(private val material: Material) {
         skin?.let { stack = stack.with(DataComponents.PROFILE, ResolvableProfile(it)) }
         itemModel?.let { stack = stack.with(DataComponents.ITEM_MODEL, it) }
         tooltipStyle?.let { stack = stack.with(DataComponents.TOOLTIP_STYLE, it) }
+        components.forEach { apply -> stack = apply(stack) }
         if (hideTooltip) {
             stack =
                 stack.with(
