@@ -171,7 +171,7 @@ private fun form(): Dialog =
  * Markers get in anyway, because of where they ride. They are glyphs in text, a dialog's body is
  * text, and the shader relocating them never asks which screen the text came from. So the plate,
  * the heading, the rule and the badge below are drawn into a dialog by the same mechanism that
- * draws a hover outline into a container.
+ * draws a hover outline into a container — confirmed on a 26.2 client, not merely expected.
  *
  * Coordinates are offsets from the screen's centre rather than from a window, since a dialog has no
  * window to measure against. The ±128px reach binds harder here than anywhere else: a dialog is

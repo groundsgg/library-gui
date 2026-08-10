@@ -317,6 +317,25 @@ nothing read blue. So one white glyph set covers every weight, instead of one
 family per colour. The shader multiplies, so tinting is exact on white or
 greyscale artwork and darkens anything already coloured.
 
+#### Dialogs
+
+Markers are not limited to containers. A resource pack barely reaches inside a
+dialog — it has three sprites of its own, the warning button in three states,
+and everything else it draws is a widget shared with the whole game, so
+restyling `widget/button` restyles the pause menu too. Layout, width, position
+and background are addressable from neither side.
+
+Markers get in regardless, because a dialog's body is text and the shader does
+not ask which screen the text came from:
+
+```kotlin
+DialogBody.PlainMessage(theme.screenMarker("plate", -112, -70), 320)
+```
+
+`screenMarker` and `screenText` take the offset from the screen's centre, since
+a dialog has no window to measure against. The ±128px reach binds harder here
+than anywhere else — a dialog is wider than a signed byte can span.
+
 The shader is per Minecraft version — 26.2 renamed `rendertype_text` to `text`,
 and a pack aimed at the wrong one overrides nothing at all, silently.
 
