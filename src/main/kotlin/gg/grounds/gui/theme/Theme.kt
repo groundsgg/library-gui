@@ -119,6 +119,28 @@ const val FRAME_CAPACITY: Int = FRAME_SPACE_BASE - FRAME_GLYPH_BASE
 const val FRAME_MARKER_RED: Int = 0xFE
 
 /**
+ * A proportional character set whose glyphs are hover frames, one per codepoint.
+ *
+ * A label painted into a panel is fixed when the pack is built, which is all a button that always
+ * says the same thing needs. A price is not that. Cutting every character into its own frame turns
+ * text into something the server composes per render: one marker per glyph, each placed at the
+ * running pen position.
+ *
+ * @param framePrefix frame id for a codepoint is [framePrefix] followed by the codepoint
+ * @param advances codepoint to pen advance; a codepoint that has an advance but no frame — a space
+ *   — moves the pen without drawing, which is exactly what a blank glyph is
+ */
+data class GlyphSet(val id: String, val framePrefix: String, val advances: Map<Int, Int>) {
+    init {
+        requireId(id, "glyph set id")
+        require(advances.isNotEmpty()) { "glyph set '$id' has no advances" }
+    }
+
+    /** The frame that draws [codepoint]. */
+    fun frame(codepoint: Int): String = "$framePrefix$codepoint"
+}
+
+/**
  * A background image drawn behind a GUI.
  *
  * The client gives a server no way to draw into a container window, so the image rides in as a font
@@ -292,6 +314,7 @@ data class Theme(
     val slotHighlight: SlotHighlight? = null,
     val bundleFiller: Boolean = false,
     val frames: List<Frame> = emptyList(),
+    val glyphSets: List<GlyphSet> = emptyList(),
 ) {
     private val glyphs: Map<String, String>
     private val panelsById: Map<String, Panel>
@@ -303,6 +326,7 @@ data class Theme(
         requireDistinct(icons.map { it.id }, "icon")
         requireDistinct(tooltips.map { it.id }, "tooltip")
         requireDistinct(frames.map { it.id }, "frame")
+        requireDistinct(glyphSets.map { it.id }, "glyph set")
         // Past this the frame block runs into the space block that cancels its advance, and every
         // frame from there on renders as a space instead of as artwork. Nothing about that failure
         // is visible — no log line, no missing file, just a hover that draws nothing — so it has to
@@ -448,7 +472,19 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
         frames += Frame(id, texture)
     }
 
+    /**
+     * Declares a character set whose glyphs are hover frames, so text can be composed at runtime.
+     *
+     * [advances] maps codepoint to pen advance and has to come from wherever the glyphs were cut,
+     * because the measurement and the artwork are the same fact: vanilla's sheet is proportional,
+     * and a second copy of those numbers is a second thing to get wrong.
+     */
+    fun glyphs(id: String, framePrefix: String, advances: Map<Int, Int>) {
+        glyphSets += GlyphSet(id, framePrefix, advances)
+    }
+
     private val frames = mutableListOf<Frame>()
+    private val glyphSets = mutableListOf<GlyphSet>()
 
     /** Builds the theme, validating ids, sizes and glyph budget. */
     fun build(): Theme =
@@ -463,5 +499,6 @@ class ThemeBuilder(private val namespace: String, private val packFormat: PackFo
             highlight,
             bundles,
             frames.toList(),
+            glyphSets.toList(),
         )
 }
