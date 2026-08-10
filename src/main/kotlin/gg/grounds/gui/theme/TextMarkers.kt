@@ -72,3 +72,28 @@ private fun GlyphSet.advanceOf(setId: String, codepoint: Int): Int =
             "glyph set '$setId' has no advance for U+${codepoint.toString(16).uppercase()}" +
                 " ('${String(Character.toChars(codepoint))}')"
         )
+
+/**
+ * A marker placed from the screen's centre rather than from a container window.
+ *
+ * Container markers are given window coordinates and converted, because the server knows a window's
+ * size but not where the client put it. A dialog has no window: it is laid out around the middle of
+ * the screen, which is the one point the shader already computes. So these coordinates are that
+ * offset directly — (0, 0) is the centre, negative is up and left.
+ *
+ * Whether this works at all is a property of where the glyph rides: markers live in text, the
+ * client draws a dialog's body with the same font pipeline as a container's title, and the shader
+ * does not care which screen asked. The ±128px reach is unchanged and matters more here, since a
+ * dialog is wider than the span of a signed byte.
+ */
+fun Theme.screenMarker(id: String, x: Int, y: Int, tint: String? = null): Component =
+    frameMarker(id, x, y, imageWidth = 0, imageHeight = 0, tint = tint)
+
+/** [text], placed from the screen's centre; see [screenMarker]. */
+fun Theme.screenText(
+    glyphSetId: String,
+    x: Int,
+    y: Int,
+    body: String,
+    tint: String? = null,
+): Component = text(glyphSetId, x, y, body, imageWidth = 0, imageHeight = 0, tint = tint)

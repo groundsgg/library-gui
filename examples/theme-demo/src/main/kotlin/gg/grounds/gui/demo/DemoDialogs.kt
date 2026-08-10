@@ -11,6 +11,8 @@ import net.minestom.server.dialog.DialogAfterAction
 import net.minestom.server.dialog.DialogBody
 import net.minestom.server.dialog.DialogInput
 import net.minestom.server.dialog.DialogMetadata
+import gg.grounds.gui.theme.screenMarker
+import gg.grounds.gui.theme.screenText
 import net.minestom.server.entity.Player
 
 /** Namespace for every action this demo sends back, so one listener can route them all. */
@@ -65,7 +67,8 @@ fun openDialogIndex(player: Player) {
                 listOf(
                     body(
                         "Real input widgets and a typed payload back — the one thing a container " +
-                            "GUI cannot do. In exchange you control none of the layout."
+                            "GUI cannot do. In exchange you control none of the layout, unless the " +
+                            "artwork rides in as markers."
                     )
                 ),
             ),
@@ -73,6 +76,7 @@ fun openDialogIndex(player: Player) {
                 button("Notice", DialogAction.ShowDialog(notice())),
                 button("Confirmation", DialogAction.ShowDialog(confirmation())),
                 button("Report form", DialogAction.ShowDialog(form())),
+                button("Themed", DialogAction.ShowDialog(themedDialog(DemoTheme.current()))),
             ),
             button("Close", null),
             // Two columns is the default; naming it makes the grid explicit.
@@ -155,6 +159,45 @@ private fun form(): Dialog =
         button("Cancel", null),
         1,
     )
+
+/**
+ * A dialog with artwork in it, which the pack format on its own cannot do.
+ *
+ * What a resource pack reaches inside a dialog is almost nothing: three sprites of its own — the
+ * warning button in three states — and otherwise the widgets it shares with the whole game.
+ * Overriding `widget/button` restyles every button in Minecraft, the pause menu included. Layout,
+ * width, position and background are addressable from neither side.
+ *
+ * Markers get in anyway, because of where they ride. They are glyphs in text, a dialog's body is
+ * text, and the shader relocating them never asks which screen the text came from. So the plate,
+ * the heading, the rule and the badge below are drawn into a dialog by the same mechanism that
+ * draws a hover outline into a container.
+ *
+ * Coordinates are offsets from the screen's centre rather than from a window, since a dialog has no
+ * window to measure against. The ±128px reach binds harder here than anywhere else: a dialog is
+ * wider than a signed byte can span, so the plate is sized to what one marker can place.
+ */
+fun themedDialog(theme: gg.grounds.gui.theme.Theme): Dialog {
+    val art =
+        Component.empty()
+            .append(theme.screenMarker("dialog_plate", -112, -70))
+            .append(theme.screenText(GLYPHS, -96, -56, "Themed dialog"))
+            .append(theme.screenMarker("dialog_rule", -96, -45, tint = ACCENT))
+            .append(theme.screenMarker("dialog_badge", -96, -34))
+            .append(theme.screenText(GLYPHS, -56, -30, "Artwork, in a dialog.", tint = DIM))
+            .append(theme.screenText(GLYPHS, -56, -18, "Drawn by markers, not", tint = DIM))
+            .append(theme.screenText(GLYPHS, -56, -6, "by the dialog format.", tint = DIM))
+
+    return Dialog.Notice(
+        meta(
+            "Themed",
+            // The body is what carries the markers. Its own text is deliberately blank: the words
+            // are drawn as artwork above, so the client has nothing of its own to lay out here.
+            listOf(DialogBody.PlainMessage(art, 320)),
+        ),
+        reports("Close", "themed_ok"),
+    )
+}
 
 /**
  * The one dialog that is not a demo of dialogs but a part of another screen.

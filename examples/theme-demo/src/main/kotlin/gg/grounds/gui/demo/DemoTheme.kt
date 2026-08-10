@@ -179,6 +179,9 @@ object DemoTheme {
             listOf("card", "well", "rule", "coin").forEach { part ->
                 frame("market_$part", "frame/market_$part.png")
             }
+            listOf("plate", "rule", "badge").forEach { part ->
+                frame("dialog_$part", "frame/dialog_$part.png")
+            }
             MARKET_CONTROLS.forEach { (icon, _) ->
                 frame("market_outline_$icon", "frame/market_outline_$icon.png")
             }

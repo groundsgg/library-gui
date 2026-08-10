@@ -825,6 +825,38 @@ def market():
         contour(load_rgba(f"gicon_{name}"), HERE / "frame" / f"market_outline_{name}.png")
 
 
+def dialog_art():
+    """Artwork for a dialog, which the pack format otherwise cannot reach at all.
+
+    A dialog has three sprites of its own — the warning button, in three states — and everything
+    else it draws is a widget shared with the rest of the game. Its layout, width, position and
+    background are not addressable from either side. Markers are the way in: they ride in text, a
+    dialog's body is text, and the shader does not ask which screen it came from.
+
+    Sized to the reach rather than to taste: a marker's position is a signed byte from the screen's
+    centre, so 224x96 is about the largest plate that can be placed as one piece.
+    """
+    sheet = load_rgba("ascii")
+    w, h = 224, 96
+    c = Canvas(w, h)
+    # A plate in the card's dark, so a themed dialog reads as the same product as the market.
+    sunken(c, 0, 0, w, h, CARD_FILL, CARD_DARK, CARD_LIGHT)
+    c.rect(3, 3, w - 6, 1, CARD_RULE)
+    c.rect(3, h - 4, w - 6, 1, CARD_RULE)
+    c.write(HERE / "frame" / "dialog_plate.png")
+
+    # A row of the accent, for a heading underline. White so the palette decides the colour.
+    Canvas(160, 1, WHITE).write(HERE / "frame" / "dialog_rule.png")
+
+    # The coin again, doubled, as something to look at.
+    sw, sh, spx = scaled(load_rgba("gicon_coins"), 2)
+    badge = Canvas(sw, sh)
+    for i, colour in enumerate(spx):
+        if colour[3]:
+            badge.set(i % sw, i // sw, colour)
+    badge.write(HERE / "frame" / "dialog_badge.png")
+
+
 def storybook():
     """The storybook index, given the same window chrome as everything else.
 
@@ -884,3 +916,4 @@ if __name__ == "__main__":
     slot_cover()
     glyph_frames()
     market()
+    dialog_art()

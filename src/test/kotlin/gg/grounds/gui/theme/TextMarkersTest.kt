@@ -70,4 +70,25 @@ class TextMarkersTest {
             }
         }
     }
+
+    @Test
+    fun `screen placement is the offset itself, with the same reach as everything else`() {
+        val subject =
+            theme("grounds", format) {
+                frame("plate", "frame/plate.png")
+                glyphs("ascii", "glyph_", mapOf(65 to 6))
+                frame("glyph_65", "frame/glyph_65.png")
+            }
+        // A dialog has no window to measure against, so these coordinates are already the offset
+        // from the screen's centre — the one point the shader computes for itself.
+        val payload =
+            subject.screenMarker("plate", -112, -70).children().first().style().color()!!.value()
+        assertEquals(-112 + 128, (payload shr 16) and 0xFF)
+        assertEquals(-70 + 128, (payload shr 8) and 0xFF)
+        // And the byte still binds: a dialog is wider than it, which is the real constraint here.
+        assertFailsWith<IllegalArgumentException> { subject.screenMarker("plate", 200, 0) }
+        assertFailsWith<IllegalArgumentException> {
+            subject.screenText("ascii", 0, 0, "A".repeat(40))
+        }
+    }
 }
