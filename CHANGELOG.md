@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/groundsgg/library-gui/compare/v0.3.0...v0.4.0) (2026-08-10)
+
+
+### Features
+
+* **art:** derive a control's hit area from its own artwork ([#17](https://github.com/groundsgg/library-gui/issues/17)) ([b63a14c](https://github.com/groundsgg/library-gui/commit/b63a14c8ec27e20422476277df1f783e96b35188))
+* **layout:** name the rectangles both halves were describing separately ([#12](https://github.com/groundsgg/library-gui/issues/12)) ([2678ac1](https://github.com/groundsgg/library-gui/commit/2678ac1439dd2a9c8d7f9df433141f2c987ecdb5))
+* **theme:** animate a marker by re-sending the slot it rides in ([#14](https://github.com/groundsgg/library-gui/issues/14)) ([c730e6a](https://github.com/groundsgg/library-gui/commit/c730e6a0b24622427ef50a10e6ef9ab38e6e1752))
+* **theme:** draw a control at any width from three sprites ([#16](https://github.com/groundsgg/library-gui/issues/16)) ([5636c9e](https://github.com/groundsgg/library-gui/commit/5636c9ec883df95d6684bf014b12dddf43150b4a))
+* **theme:** one sprite for every value of a bar ([#15](https://github.com/groundsgg/library-gui/issues/15)) ([669fa26](https://github.com/groundsgg/library-gui/commit/669fa2646b5884125ca0cadb2ae05a71b9d5f926))
+
 ## [0.3.0](https://github.com/groundsgg/library-gui/compare/v0.2.0...v0.3.0) (2026-08-10)
 
 
