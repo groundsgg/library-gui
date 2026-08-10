@@ -395,6 +395,23 @@ data class Theme(
     private val glyphs: Map<String, String>
     private val panelsById: Map<String, Panel>
 
+    /**
+     * The distinct sprites the frames draw, sorted so both halves number them identically.
+     *
+     * A frame is a name for a sprite at a position, and nothing stops two names meaning the same
+     * sprite — a screen whose empty tiles all sit on flat panel face declares one patch per slot
+     * and they are the same patch. Numbering by sprite rather than by frame is what makes that cost
+     * one glyph instead of fifty-four.
+     *
+     * The meter axis is part of the key because it is written into the sprite's own data pixels:
+     * the same PNG declared as a bar and as a plain frame are two different textures once shipped.
+     */
+    internal val frameSprites: List<Pair<String, MeterAxis?>> =
+        frames
+            .map { it.texture to it.meter }
+            .distinct()
+            .sortedWith(compareBy({ it.first }, { it.second?.code ?: 0 }))
+
     init {
         requireId(namespace, "namespace")
         requireId(font, "font name")
@@ -412,8 +429,12 @@ data class Theme(
         // frame from there on renders as a space instead of as artwork. Nothing about that failure
         // is visible — no log line, no missing file, just a hover that draws nothing — so it has to
         // be caught here rather than discovered in a screenshot.
-        require(frames.size <= FRAME_CAPACITY) {
-            "${frames.size} frames exceed the $FRAME_CAPACITY a theme can carry"
+        //
+        // Counted in sprites rather than in frames: two frames drawn from the same file are the
+        // same glyph, so a screen naming a hundred slot patches that are all the same patch costs
+        // one codepoint, not a hundred.
+        require(frameSprites.size <= FRAME_CAPACITY) {
+            "${frameSprites.size} frame sprites exceed the $FRAME_CAPACITY a theme can carry"
         }
         panelsById = panels.associateBy { it.id }
 
@@ -428,6 +449,13 @@ data class Theme(
             sorted.withIndex().associate { (index, id) ->
                 id to String(Character.toChars(Spaces.firstFreeCodepoint + index))
             }
+    }
+
+    /** Which glyph a frame draws with — its sprite's place in [frameSprites]. */
+    internal fun frameSpriteIndex(id: String): Int {
+        val frame = frames.firstOrNull { it.id == id }
+        require(frame != null) { "no frame '$id' in theme '$namespace'" }
+        return frameSprites.indexOf(frame.texture to frame.meter)
     }
 
     /** The panel declared under [id]. */

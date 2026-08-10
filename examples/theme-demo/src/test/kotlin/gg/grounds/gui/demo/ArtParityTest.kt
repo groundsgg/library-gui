@@ -6,6 +6,7 @@ import gg.grounds.gui.art.readSprite
 import gg.grounds.gui.art.slotPatches
 import java.awt.image.BufferedImage
 import kotlin.io.path.exists
+import kotlin.io.path.inputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -44,17 +45,29 @@ class ArtParityTest {
     }
 
     @Test
-    fun `the toolkit's slot patches are the generator's slot patches`() {
+    fun `every slot's patch is the panel's own pixels, whichever file it was folded onto`() {
         val panel = ART.resolve("panels/market.png")
-        assertTrue(panel.exists(), "run art/generate.py first")
+        assertTrue(panel.exists(), "run :examples:theme-demo:paintArt first")
+
+        // Identical patches share a file, so the index says which one a slot uses. Following it is
+        // the point of the check: a wrong entry would put another slot's pixels on this one, and
+        // that is exactly the failure folding them introduces.
+        val index = java.util.Properties()
+        ART.resolve("frame/market_patches.properties").inputStream().use(index::load)
 
         val produced = slotPatches(readSprite(panel), rows = 6)
         assertEquals(54, produced.size)
-        // Every slot, not a sample: the interesting ones are the tiles sitting on the heading text
-        // and on the card, and picking a few would be picking the easy ones.
+        // One entry per slot, but fewer files than entries — the saving is in the values.
+        val files = index.values.map(Any::toString).toSet()
+        assertTrue(
+            files.size < produced.size,
+            "folding has to save something, or it is only indirection: ${files.size} of ${produced.size}",
+        )
         produced.forEach { (slot, patch) ->
-            val expected = ART.resolve("frame/mk_cover_$slot.png")
-            assertTrue(expected.exists(), "missing generated patch for slot $slot")
+            val file = index.getProperty("mk_cover.$slot")
+            assertTrue(file != null, "no sprite indexed for slot $slot")
+            val expected = ART.resolve("frame/$file.png")
+            assertTrue(expected.exists(), "slot $slot points at a missing $file")
             assertEquals(0, differences(readSprite(expected), patch), "slot $slot")
             assertEquals(ITEM_AREA, patch.width)
         }

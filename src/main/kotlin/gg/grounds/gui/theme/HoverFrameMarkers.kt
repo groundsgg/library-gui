@@ -34,8 +34,8 @@ fun Theme.frameMarker(
     tint: String? = null,
     tintIndex: Int = paletteIndex(tint),
 ): Component {
-    val index = frames.map { it.id }.sorted().indexOf(id)
-    require(index >= 0) { "no frame '$id' in theme '$namespace'" }
+    // Numbered by sprite, not by name: two frames drawn from the same file are one glyph.
+    val index = frameSpriteIndex(id)
     require(imageWidth % 2 == 0 && imageHeight % 2 == 0) {
         "window is ${imageWidth}x$imageHeight; the shader halves those, so both must be even"
     }

@@ -10,10 +10,12 @@ import gg.grounds.gui.layout.slotItemY
 import gg.grounds.gui.layout.slotWellX
 import gg.grounds.gui.layout.slotWellY
 import gg.grounds.gui.art.slotPatches
+import gg.grounds.gui.art.writeDistinct
 import gg.grounds.gui.art.writeSprite
 import gg.grounds.gui.demo.MarketLayout
 import java.awt.image.BufferedImage
 import java.nio.file.Path
+import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 
 /** The overview and market are six-row screens. */
@@ -165,13 +167,14 @@ fun paintOverview(dumps: Path, out: Path) {
     canvas(16, 16, GUI_FACE).writeSprite(out.resolve("frame/ov_cover.png"))
 
     // Two families of the same cut-out, so /tint costs no rebuild: the choice is which glyph the
-    // server names, not what the pack contains.
-    slotPatches(panel, rows = 6).forEach { (slot, patch) ->
-        patch.writeSprite(out.resolve("frame/ov_cover_$slot.png"))
-    }
-    slotPatches(panel, rows = 6, lift = HOVER_TINT).forEach { (slot, patch) ->
-        patch.writeSprite(out.resolve("frame/ov_hover_$slot.png"))
-    }
+    // server names, not what the pack contains. Only the distinct ones are written — most of this
+    // screen's tiles sit on flat panel face and are the same patch.
+    val covers = writeDistinct(slotPatches(panel, rows = 6), out.resolve("frame")) { "ov_cover_$it" }
+    val hovers =
+        writeDistinct(slotPatches(panel, rows = 6, lift = HOVER_TINT), out.resolve("frame")) {
+            "ov_hover_$it"
+        }
+    writePatchIndex(out, "overview", covers, hovers)
 
     TOOLBAR_ICONS.forEach { name ->
         val icon = loadDump(dumps, "gicon_$name")
@@ -262,9 +265,11 @@ fun paintMarket(dumps: Path, out: Path) {
     }
     fill.writeSprite(out.resolve("frame/market_bar.png"))
 
-    slotPatches(panel, rows = 6).forEach { (slot, patch) ->
-        patch.writeSprite(out.resolve("frame/mk_cover_$slot.png"))
-    }
+    writePatchIndex(
+        out,
+        "market",
+        writeDistinct(slotPatches(panel, rows = 6), out.resolve("frame")) { "mk_cover_$it" },
+    )
 
     MARKET_CONTROL_ICONS.forEach { name ->
         val icon = loadDump(dumps, "gicon_$name")
@@ -296,6 +301,23 @@ fun paintDialogArt(dumps: Path, out: Path) {
     canvas(32, 32)
         .also { it.blit(loadDump(dumps, "gicon_coins").scaled(2), 0, 0) }
         .writeSprite(out.resolve("frame/dialog_badge.png"))
+}
+
+/**
+ * Which sprite each slot's patch actually uses, for the runtime to declare its frames against.
+ *
+ * The measurement travels with the artwork, the way the glyph advances and the hit areas do. A slot
+ * whose patch is shared points at the file that was written for the first slot with those pixels.
+ */
+private fun writePatchIndex(out: Path, screen: String, vararg families: Map<Int, String>) {
+    out.resolve("frame/${screen}_patches.properties")
+        .also { it.parent.createDirectories() }
+        .writeText(
+            "# slot=sprite, after folding identical patches onto one file\n" +
+                families.flatMap { it.entries }.joinToString("") { (slot, file) ->
+                    "${file.substringBeforeLast('_')}.$slot=$file\n"
+                }
+        )
 }
 
 /** Everything, in the order the Python generator ran it. */
