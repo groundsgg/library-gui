@@ -111,9 +111,16 @@ void main() {
         }
 
         // ProjMat is the GUI's orthographic matrix: m00 = 2/width, m11 = -2/height. The window
-        // stores the ceiling of framebuffer/guiScale, so re-apply it, minus a hair for the round
+        // stores the ceiling of framebuffer/guiScale, so re-apply it, minus a nudge for the round
         // trip through float.
-        vec2 screen = ceil(2.0 / vec2(ProjMat[0][0], -ProjMat[1][1]) - 0.001);
+        //
+        // Half, because the bound is two-sided and half is the middle of it. The round trip can
+        // come back high, and anything less than the error ceils a whole pixel past; it can come
+        // back low, and anything within one of a pixel of 1.0 swallows a real one. Measured, the
+        // error peaks at 4.9e-4 around width 5837 and grows with the width — so 0.001, which this
+        // used to be, held a factor of two and would have failed on a display twice as wide. Half
+        // holds a factor of a thousand and costs nothing.
+        vec2 screen = ceil(2.0 / vec2(ProjMat[0][0], -ProjMat[1][1]) - 0.5);
 
         // The server cannot know where the window lands, so it sends the sprite's top-left corner
         // as an offset from the screen's centre and the shader supplies the centre.
