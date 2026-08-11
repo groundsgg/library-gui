@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/groundsgg/library-gui/compare/v0.5.0...v0.6.0) (2026-08-11)
+
+
+### Features
+
+* **examples:** an image the server draws, in a GUI ([#21](https://github.com/groundsgg/library-gui/issues/21)) ([d96b5ee](https://github.com/groundsgg/library-gui/commit/d96b5ee2a2ca3c1e609618b67325d3d305aa28b6))
+* **pack:** add typed theme contributions ([#27](https://github.com/groundsgg/library-gui/issues/27)) ([385ea9b](https://github.com/groundsgg/library-gui/commit/385ea9b5a0aa5ec484941b77e0327c371b3a036a))
+
+
+### Bug Fixes
+
+* **theme:** centre the nudge that recovers the screen size ([#25](https://github.com/groundsgg/library-gui/issues/25)) ([f2961c3](https://github.com/groundsgg/library-gui/commit/f2961c3180fab07dbc2f78d80498acb244041300))
+
 ## [0.5.0](https://github.com/groundsgg/library-gui/compare/v0.4.0...v0.5.0) (2026-08-10)
 
 
