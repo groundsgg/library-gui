@@ -1,5 +1,6 @@
 package gg.grounds.gui.pack
 
+import gg.grounds.gui.theme.MeterAxis
 import gg.grounds.gui.theme.PackFormat as GuiPackFormat
 import gg.grounds.gui.theme.theme
 import gg.grounds.resourcepack.api.ByteArrayEntrySource
@@ -14,6 +15,7 @@ import java.awt.image.BufferedImage
 import java.lang.reflect.InvocationTargetException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Locale
 import javax.imageio.ImageIO
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createTempDirectory
@@ -28,6 +30,31 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ThemePackContributionTest {
+    @Test
+    fun `shader palette bytes ignore a comma-decimal default locale`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frame/outline.png", 4, 1)
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                frame("outline", "frame/outline.png")
+                colour("blue", 0x123456)
+            }
+        val expected =
+            bytes(subject.toPackContribution(assets), "assets/minecraft/shaders/core/text.vsh")
+        val originalLocale = Locale.getDefault()
+
+        val actual =
+            try {
+                Locale.setDefault(Locale.GERMANY)
+                bytes(subject.toPackContribution(assets), "assets/minecraft/shaders/core/text.vsh")
+            } finally {
+                Locale.setDefault(originalLocale)
+            }
+
+        assertEquals(expected.toList(), actual.toList())
+        assertTrue(actual.decodeToString().contains("vec3(0.07059, 0.20392, 0.33725)"))
+    }
+
     @Test
     fun `rejects duplicate complete planned paths`() {
         val duplicate =
@@ -478,6 +505,177 @@ class ThemePackContributionTest {
     }
 
     @Test
+    fun `frame assets are byte-identical to legacy output in stable deduplicated order`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frames/shared.png", 4, 1)
+        png(assets, "frames/left.png", 5, 2)
+        png(assets, "frames/middle.png", 6, 3)
+        png(assets, "frames/vertical.png", 7, 4)
+        val before = tree(assets)
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                frame("glyph_65", "frames/shared.png")
+                frame("also_shared", "frames/shared.png")
+                frame("slice_left", "frames/left.png")
+                frame("slice_middle", "frames/middle.png", MeterAxis.HORIZONTAL)
+                frame("slice_right", "frames/vertical.png", MeterAxis.VERTICAL)
+                glyphs("letters", "glyph_", mapOf(65 to 6))
+                slice("button", "slice_left", "slice_middle", "slice_right", 2, 6)
+                colour("zinc", 0xA0B0C0)
+                colour("amber", 0x102030)
+            }
+
+        val contribution = subject.toPackContribution(assets)
+        val legacy = createTempDirectory("legacy")
+        writePack(subject, assets, legacy)
+        val typed =
+            contribution.entries
+                .filter {
+                    it.path.value == "assets/minecraft/shaders/core/text.vsh" ||
+                        it.path.value == "assets/grounds/font/hoverframe.json" ||
+                        it.path.value.startsWith("assets/grounds/textures/font/frame_")
+                }
+                .associate {
+                    it.path.value to it.source.openStream().use { input -> input.readBytes() }
+                }
+        val written =
+            Files.walk(legacy).use { paths ->
+                paths
+                    .filter { Files.isRegularFile(it) }
+                    .map { legacy.relativize(it).toString().replace('\\', '/') }
+                    .filter {
+                        it == "assets/minecraft/shaders/core/text.vsh" ||
+                            it == "assets/grounds/font/hoverframe.json" ||
+                            it.startsWith("assets/grounds/textures/font/frame_")
+                    }
+                    .sorted()
+                    .toList()
+                    .associateWith { Files.readAllBytes(legacy.resolve(it)) }
+            }
+
+        assertEquals(before, tree(assets))
+        assertEquals(written.keys.toList(), typed.keys.sorted())
+        written.forEach { (path, expected) ->
+            assertEquals(expected.toList(), typed.getValue(path).toList(), path)
+        }
+        assertEquals(6, typed.size)
+        assertEquals(
+            0xFF050201.toInt(),
+            decoded(typed.getValue("assets/grounds/textures/font/frame_middle_horizontal.png"))
+                .getRGB(1, 0),
+        )
+        assertEquals(
+            0xFF060302.toInt(),
+            decoded(typed.getValue("assets/grounds/textures/font/frame_vertical_vertical.png"))
+                .getRGB(1, 0),
+        )
+        assertTrue(
+            text(contribution, "assets/grounds/font/hoverframe.json").contains("frame_left.png")
+        )
+    }
+
+    @Test
+    fun `rejects frame texture names that sanitize to the same path`() {
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                frame("first", "frames/a!.png")
+                frame("second", "frames/a?.png")
+            }
+
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                subject.toPackContribution(createTempDirectory("assets"))
+            }
+
+        assertTrue("a_" in failure.message.orEmpty(), failure.message.orEmpty())
+    }
+
+    @Test
+    fun `validates frame dimensions and image diagnostics without writing assets`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frames/min.png", 4, 1)
+        png(assets, "frames/max.png", 256, 256)
+        png(assets, "frames/narrow.png", 3, 1)
+        png(assets, "frames/wide.png", 257, 1)
+        png(assets, "frames/tall.png", 4, 257)
+        listOf("frames/min.png", "frames/max.png").forEach { texture ->
+            theme("grounds", GuiPackFormat(88)) {
+                    frame("frame_${texture.substringAfterLast('/').substringBefore('.')}", texture)
+                }
+                .toPackContribution(assets)
+        }
+        listOf("frames/narrow.png", "frames/wide.png", "frames/tall.png").forEach { texture ->
+            val failure =
+                assertFailsWith<IllegalArgumentException> {
+                    theme("grounds", GuiPackFormat(88)) { frame("bad", texture) }
+                        .toPackContribution(assets)
+                }
+            assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
+            assertTrue(texture in failure.message.orEmpty(), failure.message.orEmpty())
+            assertTrue(
+                assets.resolve(texture).toString() in failure.message.orEmpty(),
+                failure.message.orEmpty(),
+            )
+        }
+        val missing =
+            assertFailsWith<IllegalArgumentException> {
+                theme("grounds", GuiPackFormat(88)) { frame("missing", "frames/missing.png") }
+                    .toPackContribution(assets)
+            }
+        assertTrue("grounds" in missing.message.orEmpty(), missing.message.orEmpty())
+        assertTrue("frames/missing.png" in missing.message.orEmpty(), missing.message.orEmpty())
+        assertTrue(
+            assets.resolve("frames/missing.png").toString() in missing.message.orEmpty(),
+            missing.message.orEmpty(),
+        )
+        val broken = assets.resolve("frames/broken.png")
+        broken.parent.createDirectories()
+        broken.writeBytes(
+            byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00)
+        )
+        val afterInputs = tree(assets)
+        val unreadable =
+            assertFailsWith<IllegalArgumentException> {
+                theme("grounds", GuiPackFormat(88)) { frame("broken", "frames/broken.png") }
+                    .toPackContribution(assets)
+            }
+        assertTrue("grounds" in unreadable.message.orEmpty(), unreadable.message.orEmpty())
+        assertTrue(
+            "frames/broken.png" in unreadable.message.orEmpty(),
+            unreadable.message.orEmpty(),
+        )
+        assertTrue(broken.toString() in unreadable.message.orEmpty(), unreadable.message.orEmpty())
+        assertTrue(unreadable.cause != null)
+        assertEquals(afterInputs, tree(assets))
+    }
+
+    @Test
+    fun `palette ordering is name-stable and an empty palette retains the bundled placeholder`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frames/outline.png", 4, 1)
+        val ordered =
+            theme("grounds", GuiPackFormat(88)) {
+                frame("outline", "frames/outline.png")
+                colour("zinc", 0xA0B0C0)
+                colour("amber", 0x102030)
+            }
+        val shader =
+            text(ordered.toPackContribution(assets), "assets/minecraft/shaders/core/text.vsh")
+        val empty =
+            text(
+                theme("grounds", GuiPackFormat(88)) { frame("outline", "frames/outline.png") }
+                    .toPackContribution(assets),
+                "assets/minecraft/shaders/core/text.vsh",
+            )
+
+        assertTrue(
+            shader.indexOf("0.06275, 0.12549, 0.18824") <
+                shader.indexOf("0.62745, 0.69020, 0.75294")
+        )
+        assertTrue("const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));" in empty)
+    }
+
+    @Test
     fun `rejects a non-square slot highlight with source context`() {
         val assets = createTempDirectory("assets")
         png(assets, "highlight/back.png", 8, 7)
@@ -546,6 +744,8 @@ class ThemePackContributionTest {
         contribution: gg.grounds.resourcepack.api.PackContribution,
         path: String,
     ): String = bytes(contribution, path).decodeToString()
+
+    private fun decoded(bytes: ByteArray): BufferedImage = bytes.inputStream().use(ImageIO::read)
 
     private fun tree(root: Path): List<String> =
         Files.walk(root).use { paths ->

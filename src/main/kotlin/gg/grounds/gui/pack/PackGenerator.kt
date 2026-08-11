@@ -12,6 +12,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.LocalDateTime
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.imageio.ImageIO
@@ -313,14 +314,20 @@ private val FRAME_ID_ARGB = (0xFF shl 24) or (0xFE shl 16) or (0x4E shl 8) or 0x
  * pack always gets the real thing, and a theme that declares nothing keeps the placeholder, which
  * is harmless because nothing can then ask for a tint.
  */
-private fun withPalette(source: String, theme: Theme): String {
+internal fun withPalette(source: String, theme: Theme): String {
     if (theme.colours.isEmpty()) return source
     val entries =
         theme.colours
             .sortedBy { it.name }
             .joinToString(", ") { colour ->
                 val (r, g, b) = listOf(16, 8, 0).map { shift -> (colour.rgb shr shift) and 0xFF }
-                "vec3(%.5f, %.5f, %.5f)".format(r / 255.0, g / 255.0, b / 255.0)
+                String.format(
+                    Locale.ROOT,
+                    "vec3(%.5f, %.5f, %.5f)",
+                    r / 255.0,
+                    g / 255.0,
+                    b / 255.0,
+                )
             }
     val size = theme.colours.size
     val replaced =

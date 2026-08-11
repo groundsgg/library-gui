@@ -227,25 +227,6 @@ private fun textMarkerShader(theme: Theme): String {
     return withPalette(source, theme)
 }
 
-private fun withPalette(source: String, theme: Theme): String {
-    if (theme.colours.isEmpty()) return source
-    val entries =
-        theme.colours
-            .sortedBy { it.name }
-            .joinToString(", ") { colour ->
-                val (r, g, b) = listOf(16, 8, 0).map { shift -> (colour.rgb shr shift) and 0xFF }
-                "vec3(%.5f, %.5f, %.5f)".format(r / 255.0, g / 255.0, b / 255.0)
-            }
-    val size = theme.colours.size
-    val replaced =
-        source.replace(
-            "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));",
-            "const vec3 GROUNDS_PALETTE[$size] = vec3[$size]($entries);",
-        )
-    check(replaced != source) { "the bundled text.vsh no longer carries the palette placeholder" }
-    return replaced
-}
-
 private fun spriteName(texture: String, meter: MeterAxis?): String {
     val stem =
         texture.substringAfterLast('/').removeSuffix(".png").replace(Regex("[^a-z0-9_.-]"), "_")
@@ -261,7 +242,7 @@ private fun frameMarker(
     val art =
         checkedImage(theme, assets, texture) { image ->
             require(image.width in 4..256 && image.height in 1..256) {
-                "frame texture '$texture' is ${image.width}x${image.height}; it must be at least 4 wide for the data pixels and at most 256 in each direction, since the size is carried in a byte"
+                "Theme '${theme.namespace}' frame texture '$texture' source path ${assets.resolve(texture)} is ${image.width}x${image.height}; it must be at least 4 wide for the data pixels and at most 256 in each direction, since the size is carried in a byte"
             }
         }
     return BufferedImage(art.width, art.height + 2, BufferedImage.TYPE_INT_ARGB).also { wrapped ->
