@@ -94,6 +94,7 @@ class VanillaOverridesTest {
         val subject = theme("grounds", format) { frame("outline", "frame/outline.png") }
 
         assertEquals(listOf("shaders/core/text.vsh"), subject.vanillaOverrides())
+        assertEquals(1, subject.vanillaOverrides().count { it == "shaders/core/text.vsh" })
         assertEquals(subject.vanillaOverrides(), written(subject, assets("frame/outline.png")))
     }
 

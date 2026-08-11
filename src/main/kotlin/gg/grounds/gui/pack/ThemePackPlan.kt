@@ -1,14 +1,22 @@
 package gg.grounds.gui.pack
 
+import gg.grounds.gui.theme.FRAME_GLYPH_BASE
+import gg.grounds.gui.theme.FRAME_SPACE_BASE
+import gg.grounds.gui.theme.MeterAxis
 import gg.grounds.gui.theme.Panel
 import gg.grounds.gui.theme.Spaces
+import gg.grounds.gui.theme.TITLE_ASCENT
 import gg.grounds.gui.theme.Theme
 import gg.grounds.resourcepack.api.PackEntry
 import gg.grounds.resourcepack.api.PackEntrySource
 import gg.grounds.resourcepack.api.PackPath
 import gg.grounds.resourcepack.api.RenderingCapability
+import java.awt.image.BufferedImage
+import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
+
+internal val TEXT_MARKER_SHADER_CAPABILITY = RenderingCapability("grounds:text-marker-shader", 1)
 
 internal data class PlannedThemeEntry(val path: PackPath, val source: (Path) -> PackEntrySource)
 
@@ -140,9 +148,20 @@ private constructor(val entries: List<PlannedThemeEntry>, val provides: Set<Rend
                                 )
                             )
                         }
+                        if (theme.frames.isNotEmpty()) {
+                            add(
+                                PlannedThemeEntry(vanillaPath("shaders/core/text.vsh")) {
+                                    generatedText(textMarkerShader(theme))
+                                }
+                            )
+                            addAll(frameEntries(theme))
+                        }
                     }
                     .sortedBy { it.path }
-            return ThemePackPlan(entries, emptySet())
+            return ThemePackPlan(
+                entries,
+                if (theme.frames.isNotEmpty()) setOf(TEXT_MARKER_SHADER_CAPABILITY) else emptySet(),
+            )
         }
 
         private fun path(theme: Theme, value: String): PackPath =
@@ -169,7 +188,143 @@ private constructor(val entries: List<PlannedThemeEntry>, val provides: Set<Rend
                     validateSlotHighlight(theme, texture, image)
                 }
             }
+
+        private fun frameEntries(theme: Theme): List<PlannedThemeEntry> {
+            val spriteNames =
+                theme.frameSprites.associateWith { (texture, meter) -> spriteName(texture, meter) }
+            require(spriteNames.values.distinct().size == spriteNames.size) {
+                "two frame textures reduce to the same file name: ${spriteNames.values.groupBy { it }.filterValues { it.size > 1 }.keys}"
+            }
+            return buildList {
+                theme.frameSprites.forEachIndexed { index, sprite ->
+                    val (texture, meter) = sprite
+                    val name = spriteNames.getValue(sprite)
+                    add(
+                        PlannedThemeEntry(path(theme, "textures/font/frame_$name.png")) { assets ->
+                            generatedPng(frameMarker(theme, assets, texture, meter))
+                        }
+                    )
+                }
+                add(
+                    PlannedThemeEntry(path(theme, "font/hoverframe.json")) { assets ->
+                        generatedText(hoverFrameJson(theme, assets, spriteNames))
+                    }
+                )
+            }
+        }
     }
+}
+
+private const val FRAME_GLYPH_HEIGHT = 8
+private val FRAME_ID_ARGB = (0xFF shl 24) or (0xFE shl 16) or (0x4E shl 8) or 0x2A
+
+private fun textMarkerShader(theme: Theme): String {
+    val source =
+        checkNotNull(object {}.javaClass.getResourceAsStream("/gg/grounds/gui/pack/text.vsh")) {
+                "the bundled core/text.vsh is missing from this library's resources"
+            }
+            .use { it.readBytes().toString(UTF_8) }
+    return withPalette(source, theme)
+}
+
+private fun withPalette(source: String, theme: Theme): String {
+    if (theme.colours.isEmpty()) return source
+    val entries =
+        theme.colours
+            .sortedBy { it.name }
+            .joinToString(", ") { colour ->
+                val (r, g, b) = listOf(16, 8, 0).map { shift -> (colour.rgb shr shift) and 0xFF }
+                "vec3(%.5f, %.5f, %.5f)".format(r / 255.0, g / 255.0, b / 255.0)
+            }
+    val size = theme.colours.size
+    val replaced =
+        source.replace(
+            "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));",
+            "const vec3 GROUNDS_PALETTE[$size] = vec3[$size]($entries);",
+        )
+    check(replaced != source) { "the bundled text.vsh no longer carries the palette placeholder" }
+    return replaced
+}
+
+private fun spriteName(texture: String, meter: MeterAxis?): String {
+    val stem =
+        texture.substringAfterLast('/').removeSuffix(".png").replace(Regex("[^a-z0-9_.-]"), "_")
+    return if (meter == null) stem else "${stem}_${meter.name.lowercase()}"
+}
+
+private fun frameMarker(
+    theme: Theme,
+    assets: Path,
+    texture: String,
+    meter: MeterAxis?,
+): BufferedImage {
+    val art =
+        checkedImage(theme, assets, texture) { image ->
+            require(image.width in 4..256 && image.height in 1..256) {
+                "frame texture '$texture' is ${image.width}x${image.height}; it must be at least 4 wide for the data pixels and at most 256 in each direction, since the size is carried in a byte"
+            }
+        }
+    return BufferedImage(art.width, art.height + 2, BufferedImage.TYPE_INT_ARGB).also { wrapped ->
+        val canvas = wrapped.createGraphics()
+        canvas.drawImage(art, 0, 1, null)
+        canvas.dispose()
+        val size =
+            (0xFF shl 24) or
+                ((art.width - 1) shl 16) or
+                ((art.height - 1) shl 8) or
+                (meter?.code ?: 0)
+        listOf(0, art.height + 1).forEach { row ->
+            wrapped.setRGB(0, row, FRAME_ID_ARGB)
+            wrapped.setRGB(art.width - 1, row, FRAME_ID_ARGB)
+            wrapped.setRGB(1, row, size)
+            wrapped.setRGB(art.width - 2, row, size)
+        }
+    }
+}
+
+private fun hoverFrameJson(
+    theme: Theme,
+    assets: Path,
+    spriteNames: Map<Pair<String, MeterAxis?>, String>,
+): String {
+    val providers = mutableListOf<String>()
+    val spaces = mutableListOf<Pair<String, String>>()
+    theme.frameSprites.forEachIndexed { index, sprite ->
+        val (texture, meter) = sprite
+        val name = spriteNames.getValue(sprite)
+        val wrapped = frameMarker(theme, assets, texture, meter)
+        providers +=
+            Json.obj(
+                "type" to Json.string("bitmap"),
+                "file" to Json.string("${theme.namespace}:font/frame_$name.png"),
+                "ascent" to Json.number(TITLE_ASCENT),
+                "height" to Json.number(FRAME_GLYPH_HEIGHT),
+                "chars" to
+                    Json.array(
+                        listOf(Json.string(String(Character.toChars(FRAME_GLYPH_BASE + index))))
+                    ),
+            )
+        spaces +=
+            String(Character.toChars(FRAME_SPACE_BASE + index)) to
+                Json.number(-scaledAdvance(wrapped, FRAME_GLYPH_HEIGHT))
+    }
+    providers.add(
+        0,
+        Json.obj("type" to Json.string("space"), "advances" to Json.obj(*spaces.toTypedArray())),
+    )
+    return Json.obj("providers" to Json.array(providers))
+}
+
+private fun scaledAdvance(image: BufferedImage, height: Int): Int {
+    var column = image.width - 1
+    if (image.colorModel.hasAlpha()) {
+        while (column >= 0) {
+            if ((0 until image.height).any { y -> (image.getRGB(column, y) ushr 24) != 0 }) break
+            column--
+        }
+    }
+    val scale = height.toDouble() / image.height
+    return Math.round((column + 1) * scale).toInt() + 1
 }
 
 private fun validateSlotHighlight(

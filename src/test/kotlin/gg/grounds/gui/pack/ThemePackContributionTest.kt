@@ -8,6 +8,7 @@ import gg.grounds.resourcepack.api.FileEntrySource
 import gg.grounds.resourcepack.api.PackFormatRange as ResourcePackFormatRange
 import gg.grounds.resourcepack.api.PackPath
 import gg.grounds.resourcepack.api.RenderingCapability
+import gg.grounds.resourcepack.api.VanillaPathClaim
 import gg.grounds.resourcepack.testkit.assertVanillaClaimsMatch
 import java.awt.image.BufferedImage
 import java.lang.reflect.InvocationTargetException
@@ -23,6 +24,7 @@ import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ThemePackContributionTest {
@@ -387,6 +389,95 @@ class ThemePackContributionTest {
     }
 
     @Test
+    fun `materializes the frame shader marker assets and rendering capability`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frame/Outline!.png", 4, 2, pixels = mapOf(1 to 0xFF102030.toInt()))
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                frame("outline", "frame/Outline!.png")
+                glyphs("digits", "digit_", mapOf(48 to 6))
+                slice("button", "outline", "outline", "outline", capWidth = 2, middleWidth = 4)
+                colour("blue", 0x123456)
+            }
+
+        val contribution = subject.toPackContribution(assets)
+        val shaderPath = "assets/minecraft/shaders/core/text.vsh"
+        val shader = text(contribution, shaderPath)
+        val bundledShader =
+            checkNotNull(javaClass.getResourceAsStream("/gg/grounds/gui/pack/text.vsh")) {
+                    "test shader resource is missing"
+                }
+                .use { it.readBytes().decodeToString() }
+        val marker =
+            bytes(contribution, "assets/grounds/textures/font/frame__utline_.png")
+                .inputStream()
+                .use(ImageIO::read)
+
+        assertEquals(
+            setOf(RenderingCapability("grounds:text-marker-shader", 1)),
+            contribution.provides,
+        )
+        assertEquals(emptySet(), contribution.requires)
+        assertTrue(VanillaPathClaim(PackPath.of(shaderPath)) in contribution.vanillaClaims)
+        assertIs<ByteArrayEntrySource>(
+            contribution.entries.single { it.path.value == shaderPath }.source
+        )
+        assertTrue("const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));" !in shader)
+        assertTrue(
+            "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(0.07059, 0.20392, 0.33725));" in shader
+        )
+        assertEquals(
+            bundledShader
+                .replace(
+                    "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));",
+                    "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(0.07059, 0.20392, 0.33725));",
+                )
+                .toByteArray()
+                .toList(),
+            bytes(contribution, shaderPath).toList(),
+        )
+        assertEquals(
+            "{\"providers\":[{\"type\":\"space\",\"advances\":{\"\\uf400\":-9}},{\"type\":\"bitmap\",\"file\":\"grounds:font/frame__utline_.png\",\"ascent\":7,\"height\":8,\"chars\":[\"\\uf000\"]}]}",
+            text(contribution, "assets/grounds/font/hoverframe.json"),
+        )
+        assertTrue(contribution.entries.all { it.source is ByteArrayEntrySource })
+        assertEquals(4, marker.width)
+        assertEquals(4, marker.height)
+        assertEquals(0xFFFE4E2A.toInt(), marker.getRGB(0, 0))
+        assertEquals(0xFF030100.toInt(), marker.getRGB(1, 0))
+        assertEquals(0xFF102030.toInt(), marker.getRGB(1, 1))
+        assertEquals(0xFFFE4E2A.toInt(), marker.getRGB(3, 3))
+    }
+
+    @Test
+    fun `a frame combined with every global feature claims eight paths exactly once`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frame/outline.png", 4, 2)
+        png(assets, "highlight/back.png", 8, 8)
+        png(assets, "highlight/front.png", 8, 8)
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                frame("outline", "frame/outline.png")
+                slotHighlight("highlight/back.png", "highlight/front.png")
+                bundleFiller()
+            }
+
+        val contribution = subject.toPackContribution(assets)
+
+        assertEquals(8, contribution.vanillaClaims.size)
+        assertEquals(8, contribution.vanillaClaims.map { it.path }.toSet().size)
+        assertVanillaClaimsMatch(contribution)
+    }
+
+    @Test
+    fun `a frame-free contribution does not provide the text marker shader capability`() {
+        val contribution =
+            theme("grounds", GuiPackFormat(88)).toPackContribution(createTempDirectory("assets"))
+
+        assertEquals(emptySet(), contribution.provides)
+    }
+
+    @Test
     fun `rejects a non-square slot highlight with source context`() {
         val assets = createTempDirectory("assets")
         png(assets, "highlight/back.png", 8, 7)
@@ -428,6 +519,7 @@ class ThemePackContributionTest {
         width: Int,
         height: Int,
         opaqueWidth: Int = width,
+        pixels: Map<Int, Int> = emptyMap(),
     ): ByteArray {
         val target = assets / name
         target.parent.createDirectories()
@@ -435,6 +527,7 @@ class ThemePackContributionTest {
         (0 until height).forEach { y ->
             (0 until opaqueWidth).forEach { x -> image.setRGB(x, y, 0xFF203040.toInt()) }
         }
+        pixels.forEach { (index, pixel) -> image.setRGB(index % width, index / width, pixel) }
         target.outputStream().buffered().use { ImageIO.write(image, "png", it) }
         return target.readBytes()
     }
