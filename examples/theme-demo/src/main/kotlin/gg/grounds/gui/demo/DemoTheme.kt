@@ -218,6 +218,8 @@ object DemoTheme {
             panel("story", "panels/story.png", 176, 222)
             panel("overview", "panels/overview.png", 176, 222)
             panel("market", "panels/market.png", 176, 222)
+            // A hole where the cartography screen draws its map; see paintMapScreen.
+            panel("screen_map", "panels/screen_map.png", 176, 166)
             // One frame per drawable character, so text can be composed at runtime. A codepoint
             // with an advance but no PNG is a blank — the space — and gets no frame on purpose.
             colour(DIM, 0x969AA4)

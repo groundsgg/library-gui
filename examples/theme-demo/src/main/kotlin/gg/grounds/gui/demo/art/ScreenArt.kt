@@ -11,6 +11,7 @@ import gg.grounds.gui.layout.slotWellX
 import gg.grounds.gui.layout.slotWellY
 import gg.grounds.gui.art.slotPatches
 import gg.grounds.gui.art.writeDistinct
+import gg.grounds.gui.layout.Rect
 import gg.grounds.gui.art.writeSprite
 import gg.grounds.gui.demo.MarketLayout
 import java.awt.image.BufferedImage
@@ -109,6 +110,43 @@ fun paintScreens(out: Path) {
  * opaque — measured, both layers. So the patch is exactly the highlight's visible extent, and
  * incapable of reaching a neighbour.
  */
+/**
+ * Where the cartography screen draws the map it is given, in window pixels.
+ *
+ * Read off the client: `MAP_SPRITE` goes at (67, 13) at 66x66 and the contents at (71, 17) scaled by
+ * 0.45, so 128 pixels of map land in 58. None of it is ours to move.
+ */
+val MAP_AREA: Rect = Rect(71, 17, 58, 58)
+
+/**
+ * The cartography window, with a hole where the map goes.
+ *
+ * A panel is drawn from the window title, and `AbstractContainerScreen.extractContents` runs the
+ * background first, then the labels, then the slots. So an opaque panel covers whatever the screen
+ * drew for itself — including the map, which is the whole reason this screen was chosen. The first
+ * cut of this demo showed nothing but the item's icon, because an icon draws after the labels and
+ * the map does not.
+ */
+fun paintMapScreen(out: Path) {
+    val height = 166
+    val panel = window(PANEL_WIDTH, height)
+
+    // A well around the opening rather than up to it, so the map sits in something rather than
+    // floating in a gap.
+    val frame = MAP_AREA.inset(-3)
+    panel.sunken(frame.x, frame.y, frame.width, frame.height, CARD_DARK, 0xFF141414.toInt(), WELL_RIM)
+    for (row in 0 until MAP_AREA.height) {
+        for (column in 0 until MAP_AREA.width) {
+            panel.setRGB(MAP_AREA.x + column, MAP_AREA.y + row, 0)
+        }
+    }
+
+    // The slots this screen really has: map in, paper in, result out.
+    listOf(15 to 15, 15 to 52, 145 to 39).forEach { (x, y) -> panel.well(x - 1, y - 1) }
+    panel.playerWells(height)
+    panel.writeSprite(out.resolve("panels/screen_map.png"))
+}
+
 fun paintSlotCovers(out: Path) {
     canvas(16, 16, GUI_FACE).writeSprite(out.resolve("frame/slot_cover.png"))
     canvas(16, 16, GUI_FACE).lightened(HOVER_TINT).writeSprite(out.resolve("frame/slot_hover.png"))
@@ -339,6 +377,7 @@ fun paintAll(dumps: Path, out: Path) {
     paintGlyphs(dumps, out)
     paintMarket(dumps, out)
     paintDialogArt(dumps, out)
+    paintMapScreen(out)
 }
 
 /** Unused, but named so the contour's default rings are stated once rather than assumed. */

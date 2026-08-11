@@ -213,6 +213,10 @@ private fun registerCommands(packs: Packs) {
     market.setDefaultExecutor { sender, _ -> (sender as? Player)?.let { openMarket(it) } }
     MinecraftServer.getCommandManager().register(market)
 
+    val mapdemo = Command("mapdemo")
+    mapdemo.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openMapDemo) }
+    MinecraftServer.getCommandManager().register(mapdemo)
+
     val menu = Command("menu")
     menu.setDefaultExecutor { sender, _ -> (sender as? Player)?.let(::openMenu) }
     MinecraftServer.getCommandManager().register(menu)
@@ -382,6 +386,14 @@ private fun welcome(): Component =
         .append(
             Component.text(
                 " opens the storybook: every element, every container type.\n",
+                NamedTextColor.GRAY,
+            )
+        )
+        .append(Component.text("/mapdemo", NamedTextColor.AQUA))
+        .append(
+            Component.text(
+                " draws a picture per player and sends it as map data — the one image in this demo " +
+                    "that is not in the pack.\n",
                 NamedTextColor.GRAY,
             )
         )
