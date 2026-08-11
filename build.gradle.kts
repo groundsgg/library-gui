@@ -12,6 +12,7 @@ group = "gg.grounds"
 version = findProperty("versionOverride")?.toString() ?: "0.1.0-SNAPSHOT"
 
 val minestomVersion = "2026.07.22-26.2"
+val resourcePackVersion = "0.1.0"
 
 kotlin { jvmToolchain(25) }
 
@@ -49,9 +50,12 @@ dependencies {
     // Per-player GUIs render per-player language; adventure itself comes from
     // Minestom (library-i18n declares it compileOnly), so nothing doubles up.
     api("gg.grounds:library-i18n:0.1.1")
+    api("gg.grounds:resource-pack-api:$resourcePackVersion")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("gg.grounds:resource-pack-builder:$resourcePackVersion")
+    testImplementation("gg.grounds:resource-pack-testkit:$resourcePackVersion")
     // compileOnly is not on the test classpath; the Click-dispatch tests
     // construct Minestom click records directly.
     testImplementation("net.minestom:minestom:$minestomVersion")
