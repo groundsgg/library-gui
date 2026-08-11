@@ -711,6 +711,27 @@ class ThemePackContributionTest {
         )
     }
 
+    @Test
+    @Suppress("DEPRECATION")
+    fun `legacy writer rejects a frame theme whose pack range includes an older shader format`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "frame/outline.png", 8, 8)
+        val subject =
+            theme("grounds", GuiPackFormat(88, minInclusive = 84, maxInclusive = 88)) {
+                frame("outline", "frame/outline.png")
+            }
+
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                writePack(subject, assets, createTempDirectory("pack").resolve("out"))
+            }
+
+        assertEquals(
+            "Theme 'grounds' uses the Minecraft 26.2 text shader and must declare pack format range 88..88, but declares 84..88.",
+            failure.message,
+        )
+    }
+
     private fun png(
         assets: Path,
         name: String,

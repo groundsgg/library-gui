@@ -14,7 +14,6 @@ fun GuiPackFormat.toResourcePackFormat(): ResourcePackFormat =
     ResourcePackFormat(format = format, range = ResourcePackFormatRange(minInclusive, maxInclusive))
 
 fun Theme.toPackContribution(assets: Path): PackContribution {
-    requireShaderFormat()
     require(assets.isDirectory()) {
         "Theme '$namespace' asset root source path $assets is not a directory"
     }
@@ -26,16 +25,4 @@ fun Theme.toPackContribution(assets: Path): PackContribution {
         provides = plan.provides,
         vanillaClaims = plan.vanillaPaths.map(::VanillaPathClaim),
     )
-}
-
-private fun Theme.requireShaderFormat() {
-    if (frames.isNotEmpty()) {
-        require(
-            packFormat.format == 88 &&
-                packFormat.minInclusive == 88 &&
-                packFormat.maxInclusive == 88
-        ) {
-            "Theme '$namespace' uses the Minecraft 26.2 text shader and must declare pack format range 88..88, but declares ${packFormat.minInclusive}..${packFormat.maxInclusive}."
-        }
-    }
 }

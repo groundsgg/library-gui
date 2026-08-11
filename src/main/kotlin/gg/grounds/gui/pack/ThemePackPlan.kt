@@ -37,6 +37,7 @@ private constructor(val entries: List<PlannedThemeEntry>, val provides: Set<Rend
 
     companion object {
         fun from(theme: Theme): ThemePackPlan {
+            requireShaderFormat(theme)
             val entries =
                 buildList {
                         add(text(theme, "font/${theme.font}.json", fontJson(theme)))
@@ -162,6 +163,18 @@ private constructor(val entries: List<PlannedThemeEntry>, val provides: Set<Rend
                 entries,
                 if (theme.frames.isNotEmpty()) setOf(TEXT_MARKER_SHADER_CAPABILITY) else emptySet(),
             )
+        }
+
+        private fun requireShaderFormat(theme: Theme) {
+            if (theme.frames.isNotEmpty()) {
+                require(
+                    theme.packFormat.format == 88 &&
+                        theme.packFormat.minInclusive == 88 &&
+                        theme.packFormat.maxInclusive == 88
+                ) {
+                    "Theme '${theme.namespace}' uses the Minecraft 26.2 text shader and must declare pack format range 88..88, but declares ${theme.packFormat.minInclusive}..${theme.packFormat.maxInclusive}."
+                }
+            }
         }
 
         private fun path(theme: Theme, value: String): PackPath =

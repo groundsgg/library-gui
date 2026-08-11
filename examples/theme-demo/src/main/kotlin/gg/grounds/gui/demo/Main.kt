@@ -456,7 +456,7 @@ private fun printBanner(url: String, sha1: String, serverPort: Int) {
         |  pack     $url
         |  sha1     $sha1
         |
-        |  Join, then: /gui   and   /tune x|y|advance <px>   /tune show
+        |  Join, then: /gui   and   /tune x|y <px>   /tune show|reset
         |
         |  PACK_HOST is $url's host. If the client runs on another machine,
         |  set PACK_HOST to an address that machine can reach — the client, not
