@@ -48,7 +48,8 @@ internal fun checkedImage(
     return image
 }
 
-internal fun generatedText(value: String): PackEntrySource = ByteArrayEntrySource(value.toByteArray(UTF_8))
+internal fun generatedText(value: String): PackEntrySource =
+    ByteArrayEntrySource(value.toByteArray(UTF_8))
 
 internal fun generatedPng(image: BufferedImage): PackEntrySource {
     val bytes = ByteArrayOutputStream()

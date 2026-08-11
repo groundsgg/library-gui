@@ -508,9 +508,9 @@ private fun sha1(file: Path): String {
 fun Theme.vanillaOverrides(): List<String> =
     buildList {
             addAll(
-                ThemePackPlan.from(this@vanillaOverrides)
-                    .vanillaPaths
-                    .map { it.value.removePrefix("assets/minecraft/") }
+                ThemePackPlan.from(this@vanillaOverrides).vanillaPaths.map {
+                    it.value.removePrefix("assets/minecraft/")
+                }
             )
             // Temporary legacy compatibility bridge: writePack still ships this frame shader until
             // Task 4 moves it into ThemePackPlan after external PR #25 merges. Remove this then.

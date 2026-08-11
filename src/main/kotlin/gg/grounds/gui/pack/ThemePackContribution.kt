@@ -11,14 +11,13 @@ import java.nio.file.Path
 import kotlin.io.path.isDirectory
 
 fun GuiPackFormat.toResourcePackFormat(): ResourcePackFormat =
-    ResourcePackFormat(
-        format = format,
-        range = ResourcePackFormatRange(minInclusive, maxInclusive),
-    )
+    ResourcePackFormat(format = format, range = ResourcePackFormatRange(minInclusive, maxInclusive))
 
 fun Theme.toPackContribution(assets: Path): PackContribution {
     requireShaderFormat()
-    require(assets.isDirectory()) { "Theme '$namespace' asset root source path $assets is not a directory" }
+    require(assets.isDirectory()) {
+        "Theme '$namespace' asset root source path $assets is not a directory"
+    }
     val plan = ThemePackPlan.from(this)
     return PackContribution(
         id = ContributionId.of("$namespace:gui"),

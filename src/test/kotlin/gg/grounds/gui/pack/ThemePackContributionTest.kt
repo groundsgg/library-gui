@@ -31,12 +31,17 @@ class ThemePackContributionTest {
         val duplicate =
             PlannedThemeEntry(PackPath.of("assets/grounds/font/gui.json")) { generatedText("font") }
         val constructor =
-            ThemePackPlan::class.java.getDeclaredConstructor(List::class.java, Set::class.java)
+            ThemePackPlan::class
+                .java
+                .getDeclaredConstructor(List::class.java, Set::class.java)
                 .apply { isAccessible = true }
 
         val invocation =
             assertFailsWith<InvocationTargetException> {
-                constructor.newInstance(listOf(duplicate, duplicate), emptySet<RenderingCapability>())
+                constructor.newInstance(
+                    listOf(duplicate, duplicate),
+                    emptySet<RenderingCapability>(),
+                )
             }
 
         assertTrue(
@@ -49,9 +54,10 @@ class ThemePackContributionTest {
     fun `generated PNG is byte backed and decodes without filesystem output`() {
         val sourceTree = createTempDirectory("assets")
         val before = tree(sourceTree)
-        val image = BufferedImage(2, 3, BufferedImage.TYPE_INT_ARGB).apply {
-            setRGB(1, 2, 0xFF102030.toInt())
-        }
+        val image =
+            BufferedImage(2, 3, BufferedImage.TYPE_INT_ARGB).apply {
+                setRGB(1, 2, 0xFF102030.toInt())
+            }
 
         val source = generatedPng(image)
         val decoded = source.openStream().use { ImageIO.read(it) }
@@ -69,10 +75,13 @@ class ThemePackContributionTest {
         val texture = "panels/broken.png"
         val source = assets / texture
         source.parent.createDirectories()
-        source.writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00))
+        source.writeBytes(
+            byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00)
+        )
         val subject = theme("grounds", GuiPackFormat(88)) { panel("shop", texture, 176, 166) }
 
-        val failure = assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
+        val failure =
+            assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
 
         assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
         assertTrue(texture in failure.message.orEmpty(), failure.message.orEmpty())
@@ -113,20 +122,68 @@ class ThemePackContributionTest {
             contribution.entries.map { it.path.value },
         )
         assertEquals(sourceTree, tree(assets))
-        assertTrue(contribution.entries.single { it.path.value.endsWith("shop.png") }.source is FileEntrySource)
-        assertTrue(contribution.entries.single { it.path.value.endsWith("coin.png") }.source is FileEntrySource)
-        assertTrue(contribution.entries.single { it.path.value.endsWith("gold_background.png") }.source is FileEntrySource)
-        assertTrue(contribution.entries.single { it.path.value.endsWith("gold_frame.png") }.source is FileEntrySource)
-        assertTrue(contribution.entries.filter { it.path.value.endsWith(".json") || it.path.value.endsWith(".mcmeta") }.all { it.source is ByteArrayEntrySource })
-        assertEquals(panel.toList(), bytes(contribution, "assets/grounds/textures/gui/panels/shop.png").toList())
-        assertEquals(coin.toList(), bytes(contribution, "assets/grounds/textures/item/coin.png").toList())
-        assertEquals(background.toList(), bytes(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_background.png").toList())
-        assertEquals(frame.toList(), bytes(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_frame.png").toList())
-        assertEquals("{\"model\":{\"type\":\"minecraft:empty\"}}", text(contribution, "assets/grounds/items/blank.json"))
-        assertEquals("{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"grounds:item/coin\"}}", text(contribution, "assets/grounds/models/item/coin.json"))
-        assertEquals("{\"model\":{\"type\":\"minecraft:model\",\"model\":\"grounds:item/coin\"}}", text(contribution, "assets/grounds/items/coin.json"))
-        assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":24,\"height\":24,\"border\":4}}}", text(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_background.png.mcmeta"))
-        assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":24,\"height\":24,\"border\":4}}}", text(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_frame.png.mcmeta"))
+        assertTrue(
+            contribution.entries.single { it.path.value.endsWith("shop.png") }.source
+                is FileEntrySource
+        )
+        assertTrue(
+            contribution.entries.single { it.path.value.endsWith("coin.png") }.source
+                is FileEntrySource
+        )
+        assertTrue(
+            contribution.entries.single { it.path.value.endsWith("gold_background.png") }.source
+                is FileEntrySource
+        )
+        assertTrue(
+            contribution.entries.single { it.path.value.endsWith("gold_frame.png") }.source
+                is FileEntrySource
+        )
+        assertTrue(
+            contribution.entries
+                .filter { it.path.value.endsWith(".json") || it.path.value.endsWith(".mcmeta") }
+                .all { it.source is ByteArrayEntrySource }
+        )
+        assertEquals(
+            panel.toList(),
+            bytes(contribution, "assets/grounds/textures/gui/panels/shop.png").toList(),
+        )
+        assertEquals(
+            coin.toList(),
+            bytes(contribution, "assets/grounds/textures/item/coin.png").toList(),
+        )
+        assertEquals(
+            background.toList(),
+            bytes(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_background.png")
+                .toList(),
+        )
+        assertEquals(
+            frame.toList(),
+            bytes(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_frame.png")
+                .toList(),
+        )
+        assertEquals(
+            "{\"model\":{\"type\":\"minecraft:empty\"}}",
+            text(contribution, "assets/grounds/items/blank.json"),
+        )
+        assertEquals(
+            "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"grounds:item/coin\"}}",
+            text(contribution, "assets/grounds/models/item/coin.json"),
+        )
+        assertEquals(
+            "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"grounds:item/coin\"}}",
+            text(contribution, "assets/grounds/items/coin.json"),
+        )
+        assertEquals(
+            "{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":24,\"height\":24,\"border\":4}}}",
+            text(
+                contribution,
+                "assets/grounds/textures/gui/sprites/tooltip/gold_background.png.mcmeta",
+            ),
+        )
+        assertEquals(
+            "{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":24,\"height\":24,\"border\":4}}}",
+            text(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_frame.png.mcmeta"),
+        )
         assertEquals(
             """{"providers":[{"type":"space","advances":{"\ue000":1,"\ue001":-1,"\ue002":2,"\ue003":-2,"\ue004":4,"\ue005":-4,"\ue006":8,"\ue007":-8,"\ue008":16,"\ue009":-16,"\ue00a":32,"\ue00b":-32,"\ue00c":64,"\ue00d":-64,"\ue00e":128,"\ue00f":-128,"\ue010":256,"\ue011":-256,"\ue012":512,"\ue013":-512,"\ue014":1024,"\ue015":-1024}},{"type":"bitmap","file":"grounds:gui/panels/shop.png","ascent":13,"height":166,"chars":["\ue016"]}]}""",
             text(contribution, "assets/grounds/font/gui.json"),
@@ -137,30 +194,63 @@ class ThemePackContributionTest {
     fun `reports namespace and source path for asset validation failures`() {
         val assets = createTempDirectory("assets")
         val missingRoot = createTempDirectory("missing") / "absent"
-        val missing = theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/missing.png", 176, 166) }
-        val wrongSize = theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/wrong.png", 176, 166) }
+        val missing =
+            theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/missing.png", 176, 166) }
+        val wrongSize =
+            theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/wrong.png", 176, 166) }
         png(assets, "panels/wrong.png", 175, 166)
-        val transparent = theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/soft.png", 176, 166) }
+        val transparent =
+            theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/soft.png", 176, 166) }
         png(assets, "panels/soft.png", 176, 166, opaqueWidth = 100)
-        val oversized = theme("grounds", GuiPackFormat(88)) { tooltip("gold", "tooltips/a.png", "tooltips/b.png", border = 4) }
+        val oversized =
+            theme("grounds", GuiPackFormat(88)) {
+                tooltip("gold", "tooltips/a.png", "tooltips/b.png", border = 4)
+            }
         png(assets, "tooltips/a.png", 6, 6)
         png(assets, "tooltips/b.png", 6, 6)
 
-        val rootFailure = assertFailsWith<IllegalArgumentException> { missing.toPackContribution(missingRoot) }
+        val rootFailure =
+            assertFailsWith<IllegalArgumentException> { missing.toPackContribution(missingRoot) }
         listOf(
-            rootFailure,
-            assertFailsWith<IllegalArgumentException> { missing.toPackContribution(assets) },
-            assertFailsWith<IllegalArgumentException> { wrongSize.toPackContribution(assets) },
-            assertFailsWith<IllegalArgumentException> { transparent.toPackContribution(assets) },
-            assertFailsWith<IllegalArgumentException> { oversized.toPackContribution(assets) },
-        ).forEach { failure ->
-            assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
-        }
-        assertTrue(missingRoot.toString() in rootFailure.message.orEmpty(), rootFailure.message.orEmpty())
-        assertTrue("panels/missing.png" in assertFailsWith<IllegalArgumentException> { missing.toPackContribution(assets) }.message.orEmpty())
-        assertTrue("panels/wrong.png" in assertFailsWith<IllegalArgumentException> { wrongSize.toPackContribution(assets) }.message.orEmpty())
-        assertTrue("panels/soft.png" in assertFailsWith<IllegalArgumentException> { transparent.toPackContribution(assets) }.message.orEmpty())
-        assertTrue("tooltips/a.png" in assertFailsWith<IllegalArgumentException> { oversized.toPackContribution(assets) }.message.orEmpty())
+                rootFailure,
+                assertFailsWith<IllegalArgumentException> { missing.toPackContribution(assets) },
+                assertFailsWith<IllegalArgumentException> { wrongSize.toPackContribution(assets) },
+                assertFailsWith<IllegalArgumentException> {
+                    transparent.toPackContribution(assets)
+                },
+                assertFailsWith<IllegalArgumentException> { oversized.toPackContribution(assets) },
+            )
+            .forEach { failure ->
+                assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
+            }
+        assertTrue(
+            missingRoot.toString() in rootFailure.message.orEmpty(),
+            rootFailure.message.orEmpty(),
+        )
+        assertTrue(
+            "panels/missing.png" in
+                assertFailsWith<IllegalArgumentException> { missing.toPackContribution(assets) }
+                    .message
+                    .orEmpty()
+        )
+        assertTrue(
+            "panels/wrong.png" in
+                assertFailsWith<IllegalArgumentException> { wrongSize.toPackContribution(assets) }
+                    .message
+                    .orEmpty()
+        )
+        assertTrue(
+            "panels/soft.png" in
+                assertFailsWith<IllegalArgumentException> { transparent.toPackContribution(assets) }
+                    .message
+                    .orEmpty()
+        )
+        assertTrue(
+            "tooltips/a.png" in
+                assertFailsWith<IllegalArgumentException> { oversized.toPackContribution(assets) }
+                    .message
+                    .orEmpty()
+        )
     }
 
     @Test
@@ -178,7 +268,10 @@ class ThemePackContributionTest {
 
         assertEquals(ContributionId.of("example:gui"), contribution.id)
         assertEquals(ResourcePackFormatRange(88, 88), contribution.supportedFormats)
-        assertEquals(listOf("assets/example/font/gui.json"), contribution.entries.map { it.path.value })
+        assertEquals(
+            listOf("assets/example/font/gui.json"),
+            contribution.entries.map { it.path.value },
+        )
         assertEquals(emptySet(), contribution.vanillaClaims)
         assertEquals(emptySet(), contribution.provides)
         assertEquals(emptySet(), contribution.requires)
@@ -222,33 +315,72 @@ class ThemePackContributionTest {
         assertEquals(7, vanillaEntries.size)
         assertTrue(
             vanillaEntries
-                .filter { it.path.value.endsWith("slot_highlight_back.png") || it.path.value.endsWith("slot_highlight_front.png") }
-                .all { it.source is FileEntrySource },
+                .filter {
+                    it.path.value.endsWith("slot_highlight_back.png") ||
+                        it.path.value.endsWith("slot_highlight_front.png")
+                }
+                .all { it.source is FileEntrySource }
         )
         assertTrue(
             vanillaEntries
-                .filterNot { it.path.value.endsWith("slot_highlight_back.png") || it.path.value.endsWith("slot_highlight_front.png") }
-                .all { it.source is ByteArrayEntrySource },
+                .filterNot {
+                    it.path.value.endsWith("slot_highlight_back.png") ||
+                        it.path.value.endsWith("slot_highlight_front.png")
+                }
+                .all { it.source is ByteArrayEntrySource }
         )
-        assertEquals(back.toList(), bytes(contribution, "assets/minecraft/textures/gui/sprites/container/slot_highlight_back.png").toList())
-        assertEquals(front.toList(), bytes(contribution, "assets/minecraft/textures/gui/sprites/container/slot_highlight_front.png").toList())
-        assertEquals("{\"item.minecraft.bundle.empty\":\"\",\"item.minecraft.bundle.empty.description\":\"\"}", text(contribution, "assets/minecraft/lang/en_us.json"))
-        assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":12,\"height\":12,\"border\":2}}}", text(contribution, "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta"))
-        assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":6,\"height\":6,\"border\":2}}}", text(contribution, "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png.mcmeta"))
+        assertEquals(
+            back.toList(),
+            bytes(
+                    contribution,
+                    "assets/minecraft/textures/gui/sprites/container/slot_highlight_back.png",
+                )
+                .toList(),
+        )
+        assertEquals(
+            front.toList(),
+            bytes(
+                    contribution,
+                    "assets/minecraft/textures/gui/sprites/container/slot_highlight_front.png",
+                )
+                .toList(),
+        )
+        assertEquals(
+            "{\"item.minecraft.bundle.empty\":\"\",\"item.minecraft.bundle.empty.description\":\"\"}",
+            text(contribution, "assets/minecraft/lang/en_us.json"),
+        )
+        assertEquals(
+            "{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":12,\"height\":12,\"border\":2}}}",
+            text(
+                contribution,
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta",
+            ),
+        )
+        assertEquals(
+            "{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":6,\"height\":6,\"border\":2}}}",
+            text(
+                contribution,
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png.mcmeta",
+            ),
+        )
         listOf(
-            "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png" to 12,
-            "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png" to 6,
-        ).forEach { (path, size) ->
-            val image = bytes(contribution, path).inputStream().use(ImageIO::read)
-            assertEquals(size, image.width)
-            assertEquals(size, image.height)
-            assertEquals(0, image.getRGB(0, 0))
-        }
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png" to
+                    12,
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png" to
+                    6,
+            )
+            .forEach { (path, size) ->
+                val image = bytes(contribution, path).inputStream().use(ImageIO::read)
+                assertEquals(size, image.width)
+                assertEquals(size, image.height)
+                assertEquals(0, image.getRGB(0, 0))
+            }
         val generated = createTempDirectory("pack")
         writePack(subject, assets, generated)
         vanillaEntries.forEach { entry ->
             assertTrue(
-                Files.readAllBytes(generated.resolve(entry.path.value)).contentEquals(bytes(contribution, entry.path.value)),
+                Files.readAllBytes(generated.resolve(entry.path.value))
+                    .contentEquals(bytes(contribution, entry.path.value)),
                 entry.path.value,
             )
         }
@@ -264,7 +396,8 @@ class ThemePackContributionTest {
                 slotHighlight("highlight/back.png", "highlight/front.png")
             }
 
-        val failure = assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
+        val failure =
+            assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
 
         assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
         assertTrue("highlight/back.png" in failure.message.orEmpty(), failure.message.orEmpty())
@@ -289,7 +422,13 @@ class ThemePackContributionTest {
         )
     }
 
-    private fun png(assets: Path, name: String, width: Int, height: Int, opaqueWidth: Int = width): ByteArray {
+    private fun png(
+        assets: Path,
+        name: String,
+        width: Int,
+        height: Int,
+        opaqueWidth: Int = width,
+    ): ByteArray {
         val target = assets / name
         target.parent.createDirectories()
         val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
@@ -300,12 +439,23 @@ class ThemePackContributionTest {
         return target.readBytes()
     }
 
-    private fun bytes(contribution: gg.grounds.resourcepack.api.PackContribution, path: String): ByteArray =
-        contribution.entries.single { it.path.value == path }.source.openStream().use { it.readBytes() }
+    private fun bytes(
+        contribution: gg.grounds.resourcepack.api.PackContribution,
+        path: String,
+    ): ByteArray =
+        contribution.entries
+            .single { it.path.value == path }
+            .source
+            .openStream()
+            .use { it.readBytes() }
 
-    private fun text(contribution: gg.grounds.resourcepack.api.PackContribution, path: String): String =
-        bytes(contribution, path).decodeToString()
+    private fun text(
+        contribution: gg.grounds.resourcepack.api.PackContribution,
+        path: String,
+    ): String = bytes(contribution, path).decodeToString()
 
     private fun tree(root: Path): List<String> =
-        Files.walk(root).use { paths -> paths.map { root.relativize(it).toString() }.sorted().toList() }
+        Files.walk(root).use { paths ->
+            paths.map { root.relativize(it).toString() }.sorted().toList()
+        }
 }
