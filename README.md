@@ -11,8 +11,10 @@ dependencies {
 
 ## Compatibility
 
-`library-gui` 0.2.x targets Minecraft 26.2 with Minestom `2026.07.22-26.2` and JVM 25.
-The host supplies Minestom; consumers must not shade a second copy.
+This migration branch targets Minecraft 26.2 with Minestom `2026.07.22-26.2`
+and JVM 25. The host supplies Minestom; consumers must not shade a second copy.
+The typed-contribution flow below is unreleased on this migration branch; the
+eventual `library-gui` release version has not yet been assigned.
 
 ## Basics
 
@@ -150,44 +152,83 @@ anvilInput(player, Component.text("Party name")) { text ->
 ## Themes: custom graphics
 
 A theme is the one declaration behind both halves of a custom-looking GUI — the
-resource pack the client downloads, and the components the server sends. Keeping
-those two in sync by hand is what usually breaks; here neither can be generated
-without the other.
+resource-pack contribution the product composes, and the components the server
+sends.
 
 ```kotlin
-val guiTheme = theme("grounds", PackFormat(88, minInclusive = 84, maxInclusive = 88)) {
-    description = "Grounds GUI"
-    // Background artwork. width/height are the PNG's real size — the generator
-    // fails the build if the file on disk ever disagrees.
+import gg.grounds.gui.pack.toPackContribution
+import gg.grounds.gui.theme.PackFormat
+import gg.grounds.gui.theme.theme
+
+val guiTheme = theme("grounds", PackFormat(88)) {
+    frame("hover", "frame/hover.png")
     panel("shop", "panels/shop.png", 176, 166, offsetY = -6)
-    // A graphic that replaces an item's whole appearance.
     icon("coin", "icons/coin.png")
-    // A hover effect: this button's tooltip is drawn with these sprites.
     tooltip("gold", "tooltips/gold_bg.png", "tooltips/gold_frame.png")
+}
+
+val contribution = guiTheme.toPackContribution(assets)
+```
+
+`assets` is the product's artwork root. `PackFormat` is per Minecraft version —
+read `pack_version.resource_major` out of that version's `version.json` rather
+than guessing (26.2 is 88). A theme with any `frame` provides the rendering
+capability `grounds:text-marker-shader/v1` and must declare **exactly format
+88** (`PackFormat(88)`, with no range); it overrides the 26.2 text shader.
+
+### Compose and write in the product
+
+`library-gui` declares a typed contribution. The product owns the
+`PackDefinition`, chooses its other contributions and policy, composes the
+complete pack, and writes the final ZIP artifact. This is also where it serves
+the artifact and couples the URL sent to clients to that artifact's SHA-1.
+
+This separate product/demo composition code needs the builder explicitly:
+
+```kotlin
+dependencies {
+    implementation("gg.grounds:resource-pack-builder:0.1.0")
 }
 ```
 
-`PackFormat` is per Minecraft version — read `pack_version.resource_major` out of
-that version's `version.json` rather than guessing (26.2 is 88). The range says
-which clients the pack claims to serve.
-
-Building the pack is a build-time step, not a server one:
+Ordinary `library-gui` consumers remain API-only and do not add the builder.
 
 ```kotlin
-writePack(guiTheme, assets = Path.of("art"), out = Path.of("build/pack"))
-val sha1 = zipPack(Path.of("build/pack"), Path.of("build/grounds-gui.zip"))
-```
+import gg.grounds.gui.pack.toResourcePackFormat
+import gg.grounds.resourcepack.api.PackDefinition
+import gg.grounds.resourcepack.api.PackPolicy
+import gg.grounds.resourcepack.api.VanillaPathPolicy
+import gg.grounds.resourcepack.builder.ResourcePackComposer
+import gg.grounds.resourcepack.builder.ZipPackWriter
+import java.nio.file.Path
 
-Host that zip and hand the client both halves:
-
-```kotlin
-player.sendResourcePacks(
-    ResourcePackRequest.resourcePackRequest()
-        .packs(ResourcePackInfo.resourcePackInfo(id, URI.create(url), sha1))
-        .required(true)
-        .build(),
+val definition = PackDefinition(
+    description = guiTheme.description,
+    format = guiTheme.packFormat.toResourcePackFormat(),
+    policy = PackPolicy(vanillaPaths = VanillaPathPolicy.ALLOW_CLAIMED),
 )
+val composed = ResourcePackComposer().compose(definition, listOf(contribution))
+val artifact = ZipPackWriter().write(composed, Path.of("build/grounds-gui.zip"))
+// Serve artifact.path and pass artifact.sha1 with that exact URL to the client.
 ```
+
+`ResourcePackComposer` performs validation before it composes: contributions
+must be compatible and every claimed vanilla path must be allowed by the
+definition. There is **no JSON merge**: a contribution owns complete emitted
+files, including each `assets/minecraft/**` file it emits. Two contributions
+cannot share a vanilla path.
+
+### Compatibility facades
+
+`writePack` and `zipPack` remain deprecated **0.x facades** for existing callers;
+new code uses `Theme.toPackContribution(assets)` and product-owned composition.
+They are not the production flow. `library-gui` production consumers need
+`resource-pack-api`, but do not need `resource-pack-builder`; builder usage here
+is demo/product integration only.
+
+`Theme.vanillaOverrides()` is also a compatibility view: it returns paths
+relative to `assets/minecraft`, while `VanillaPathClaim` uses complete pack paths
+(for example, `assets/minecraft/shaders/core/text.vsh`).
 
 Using it is the normal DSL — the theme only supplies the title and two item ids:
 
@@ -350,6 +391,10 @@ Ask a theme what it claims before shipping it beside another pack:
 ```kotlin
 theme.vanillaOverrides()
 ```
+
+This list is relative to `assets/minecraft`; composition uses complete
+`VanillaPathClaim` paths. Every emitted `assets/minecraft/**` file is exclusively
+claimed, because the composer never merges JSON or any other file contents.
 
 It is derived from the theme rather than written down, because a hand-kept list
 goes stale: the first one here said "the text shader and the slot highlight" and

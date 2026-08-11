@@ -20,6 +20,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
+@Suppress("DEPRECATION")
 class PackGeneratorTest {
     private val assets = createTempDirectory("assets")
     private val out = createTempDirectory("pack") / "out"

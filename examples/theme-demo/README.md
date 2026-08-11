@@ -1,102 +1,74 @@
 # theme-demo
 
-A runnable server for settling a theme's title offsets against a real client.
-
-The library positions a panel with numbers taken from how vanilla lays a
-container title out. Nothing in it has been measured against a running client,
-and it cannot be — so this demo exists to close that gap: join, open the GUI,
-nudge until the artwork's slot grid sits under the real slots, and paste what
-`/tune show` prints back into your theme.
+A runnable Minecraft 26.2 server that demonstrates typed GUI resource-pack
+contributions, title calibration, marker-driven UI, and runtime map imagery.
 
 ```bash
 ./gradlew :examples:theme-demo:run
 ```
 
-Then connect a **Minecraft 26.2** client to `localhost:25565` and type `/gui`.
+Connect a **Minecraft 26.2** client, then use `/gui`. The demo's frame theme
+declares **exactly format 88**: frames provide
+`grounds:text-marker-shader/v1`, which is the 26.2 text-shader capability.
 
-## Tuning
+## Pack lifecycle
 
-The panel is a calibration target, not decoration: 8px rulers along the top and
-left edge, and a slot grid at the positions a 3-row container uses. A misalign
-is readable in pixels instead of guessable.
+The demo is intentionally product integration, not the `library-gui` production
+dependency model. It converts `DemoTheme` with `toPackContribution(ART)`, owns a
+`PackDefinition`, composes with `ResourcePackComposer`, and writes the completed
+artifact with `ZipPackWriter`.
+
+Each rebuilt ZIP is published at an immutable, content-addressed URL of the form
+`/packs/<sha1>.zip`. The exact artifact SHA-1 is both checked against the bytes
+the host snapshots and sent to the client with that same URL. Older URLs remain
+valid for the process lifetime, while the pack identity is stable and requests
+use `replace(false)` so a rebuild does not discard unrelated server packs.
+
+## Commands
 
 | Command | Effect |
 | --- | --- |
-| `/gui` | Opens the themed GUI |
-| `/hover` | Opens the hover-only screen (see below) |
-| `/glow` | Toggles the slot glow — **rebuilds the pack**, client refetches |
-| `/tune x <px>` | Horizontal offset — instant, no download |
-| `/tune y <px>` | Vertical offset — **rebuilds the pack**, client refetches |
-| `/tune show` | Prints the current values as a pasteable `panel(...)` line |
-| `/tune reset` | Back to the library's defaults |
+| `/gui` | Opens the calibrated themed GUI. |
+| `/overview` | Opens the marker and hover overview. |
+| `/hover` | Opens the hover-only comparison screen. |
+| `/glow` | Toggles the global slot glow and rebuilds/re-sends the pack. |
+| `/highlight` | Blanks or restores the vanilla highlight and rebuilds/re-sends the pack. |
+| `/tint` | Toggles runtime-only empty-tile tinting; reopen the screen, no pack rebuild. |
+| `/tune x <px>` | Changes the title offset; reopen the GUI, no pack download. |
+| `/tune y <px>` | Changes glyph ascent; rebuilds/re-sends the pack. |
+| `/tune show` | Prints a pasteable `panel(...)` declaration. |
+| `/tune reset` | Restores the tuning offset defaults and rebuilds/re-sends the pack. |
+| `/story`, `/market`, `/menu`, `/dialog`, `/ui` | Open the other GUI and dialog demonstrations. |
+| `/mapdemo` | Shows a per-player image sent as map data. |
 
-`x` only changes the string the server puts in the window title, so it applies on
-the next open. `y` becomes the glyph's *ascent*, which lives in the font file —
-so it is a new pack with a new hash, and the client downloads it again. `/tune y`
-therefore does not reopen the GUI for you: reopen with `/gui` once the download
-lands, or you will be looking at the old artwork. `DemoThemeTest` pins exactly
-this split.
+Do not send another rebuilding command while a pack request is pending: the demo
+refuses it so an in-flight required request is not discarded. `/tune y`,
+`/tune reset`, `/glow`, and `/highlight` need a fresh download; reopen the
+relevant GUI after the client has loaded it.
 
-A panel's *advance* is deliberately not tunable. The generator reproduces the
-client's own measurement — it trims fully transparent columns off the right edge
-before measuring — and fails the build with the correct number, so a hand-set
-value could only ever be the wrong one.
+## Hover and markers
 
-While a pack is still on its way, `/tune y` and `/tune reset` refuse to send
-another. Replacing a push that has not settled makes the client report the old
-pack as discarded, and because the push is required, that terminal status would
-kick you out of your own session.
+`/hover` isolates a tooltip-style effect. The global slot-highlight override is
+deliberately separate: it affects every container, including the player's own
+inventory. Marker frames are different: their glyphs ride in the hovered item's
+tooltip and the shader relocates them, allowing a selected slot or control to
+draw its own frame without the server learning the cursor position.
 
-## The hover-only screen
-
-`/hover` opens a five-slot hopper with everything except the hover effect switched
-off: no panel behind the window, no `item_model` on the items, a plain vanilla
-title. The middle pickaxe carries a `tooltip_style`; the axe and shovel beside it
-carry nothing. Whatever differs when you hover the middle one *is* the effect,
-with its neighbours as the control.
-
-Five compartments rather than a chest's twenty-seven, so the comparison is one
-glance instead of a hunt.
-
-The theme also replaces the **slot highlight** with a glow around the hovered
-item — the bloom sits on the `back` layer, so it spills into the 4px around the
-item rather than washing over it, and the `front` layer is left empty.
-
-That one is a vanilla sprite override, so unlike the tooltip skin it is global: it
-changes the hover glow in every container, the player's own inventory included,
-and cannot be limited to a single GUI. `/glow` toggles it and re-sends the pack,
-which is the only honest way to decide between everywhere and nowhere — those are
-the two options.
-
-Between them those two are the full extent of what a server can do to hover. The
-client never reports what the cursor is over — it draws *this* item's tooltip
-with *these* sprites, and its own highlight wherever it likes. Effects tied to
-one specific slot need a core shader in the pack, which this demo does not ship.
+`/mapdemo` demonstrates the boundary. A marker sprite must already exist in the
+pack, so it cannot show per-player or newly generated artwork. The cartography
+table demo instead draws a map per player and sends map data; the image is not a
+marker and is not stored in the resource pack.
 
 ## Configuration
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `SERVER_PORT` | `25565` | Minecraft listen port |
-| `PACK_PORT` | `8080` | HTTP port the pack is served on |
-| `PACK_HOST` | `127.0.0.1` | Host **the client** resolves to fetch the pack |
+| `SERVER_PORT` | `25565` | Minecraft listen port. |
+| `PACK_PORT` | `8080` | HTTP port for immutable artifacts. |
+| `PACK_HOST` | routable local address | Host the **client** resolves to fetch the artifact. |
+| `PACK_REQUIRED` | `true` | Set `false` only while iterating on a broken shader. |
 
-`PACK_HOST` is the one that catches people out: the client downloads the pack,
-not the server. If the client runs on another machine, `127.0.0.1` points it at
-itself — set an address that machine can actually reach.
-
-## Things worth knowing before you run it
-
-- **The server is in offline mode.** `MinecraftServer.init()` is
-  `init(Auth.Offline())` — there is no `MojangAuth` in 26.2. It accepts any
-  username with no session check. Local development only; never expose it.
-- **The pack is sent as required.** Minestom kicks on any terminal pack status
-  that is not `SUCCESSFULLY_LOADED`, so a declined or failed download drops the
-  player with "Required resource pack was not loaded." That is deliberate: a
-  silent fallback to vanilla would waste your time wondering why nothing looks
-  themed. The console logs every terminal status.
-- **The hash cannot drift.** The SHA-1 handed to the client is computed from the
-  exact bytes the HTTP host serves, in the same call. A stale hash would kick
-  every player who joins, which is the failure this arrangement removes.
-- **Artwork is generated, not drawn.** `art/generate.py` rebuilds all four PNGs;
-  run it if you want to change the calibration target.
+`PACK_HOST` must be reachable from the client; `127.0.0.1` is the client's
+loopback when the server and client are on different machines. The demo runs in
+offline mode for local development only. Artwork is generated by the demo's
+Gradle task when needed: `./gradlew :examples:theme-demo:paintArt`.

@@ -3,33 +3,35 @@ package gg.grounds.gui.demo
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.readBytes
 
 /**
  * Serves the generated pack over plain HTTP so a local client can fetch it.
  *
- * The bytes are swappable: tuning a panel's vertical offset rewrites the font's ascent, which is
- * part of the pack, so that adjustment has to go out as a new download. Horizontal offset and
- * advance do not — they only change the title string the server sends. Keeping that distinction
- * visible is half the point of this demo.
+ * Each artifact has an immutable content-addressed URL. Published snapshots deliberately remain
+ * in memory for the demo process lifetime, so a client that downloads an older request later still
+ * receives the exact bytes whose hash it was given.
  */
 class PackHost(private val port: Int) {
-    @Volatile private var payload: ByteArray = ByteArray(0)
+    private val published = ConcurrentHashMap<String, ByteArray>()
 
     private val server: HttpServer = HttpServer.create(InetSocketAddress(port), 0)
 
     init {
-        server.createContext("/pack.zip") { exchange ->
-            val body = payload
-            val status = if (body.isEmpty()) 404 else 200
+        server.createContext("/packs") { exchange ->
+            val hash = exchange.requestURI.path.removePrefix("/packs/").removeSuffix(".zip")
+            val body = published[hash]
+            val status = if (body == null) 404 else 200
             // Logged because the alternative is guessing. A failed pack download tells the server
             // only FAILED_DOWNLOAD; whether the request ever arrived is the difference between a
             // broken pack and a client that cannot reach this host at all.
             println("[pack-host] ${exchange.requestMethod} ${exchange.requestURI} from " +
-                "${exchange.remoteAddress} -> $status (${body.size} bytes)")
-            exchange.responseHeaders.add("Content-Type", "application/zip")
-            exchange.sendResponseHeaders(status, body.size.toLong())
-            exchange.responseBody.use { if (body.isNotEmpty()) it.write(body) }
+                "${exchange.remoteAddress} -> $status (${body?.size ?: 0} bytes)")
+            if (body != null) exchange.responseHeaders.add("Content-Type", "application/zip")
+            exchange.sendResponseHeaders(status, body?.size?.toLong() ?: -1)
+            exchange.responseBody.use { if (body != null) it.write(body) }
         }
         server.executor = null
     }
@@ -51,11 +53,26 @@ class PackHost(private val port: Int) {
         server.stop(0)
     }
 
-    /** Publishes [zip]'s current bytes; later calls replace what the next download returns. */
-    fun publish(zip: Path) {
-        payload = zip.readBytes()
+    /** Snapshots [zip] under [sha1], rejecting a hash/byte mismatch or a hash collision. */
+    fun publish(zip: Path, sha1: String) {
+        val bytes = zip.readBytes()
+        require(sha1(bytes) == sha1) {
+            "Supplied SHA-1 $sha1 does not match bytes from $zip"
+        }
+        published.compute(sha1) { _, previous ->
+            when {
+                previous == null -> bytes
+                previous.contentEquals(bytes) -> previous
+                else -> error("SHA-1 $sha1 is already bound to different pack bytes")
+            }
+        }
     }
 
-    /** The URL to hand the client. [host] must be an address that client can actually reach. */
-    fun url(host: String): String = "http://$host:$port/pack.zip"
+    /** The immutable artifact URL to hand the client. [host] must be reachable by that client. */
+    fun url(host: String, sha1: String): String = "http://$host:${server.address.port}/packs/$sha1.zip"
+
+    private fun sha1(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-1")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
 }

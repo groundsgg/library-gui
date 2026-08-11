@@ -69,9 +69,19 @@ class VanillaOverridesTest {
                 bundleFiller()
             }
         val expected = subject.vanillaOverrides()
-        // The three claims, spelled out once so a change to the generator has to be deliberate.
-        assertTrue("shaders/core/text.vsh" in expected)
-        assertTrue("lang/en_us.json" in expected, "the quiet one: a pack owns this file wholesale")
+        assertEquals(
+            listOf(
+                "lang/en_us.json",
+                "shaders/core/text.vsh",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_border.png",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_fill.png",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_fill.png.mcmeta",
+                "textures/gui/sprites/container/slot_highlight_back.png",
+                "textures/gui/sprites/container/slot_highlight_front.png",
+            ),
+            expected,
+        )
         assertEquals(8, expected.size)
         assertEquals(
             expected,
@@ -80,11 +90,16 @@ class VanillaOverridesTest {
     }
 
     @Test
-    fun `each claim is conditional on the feature that needs it`() {
-        val frames = theme("grounds", format) { frame("outline", "frame/outline.png") }
-        assertEquals(listOf("shaders/core/text.vsh"), frames.vanillaOverrides())
-        assertEquals(frames.vanillaOverrides(), written(frames, assets("frame/outline.png")))
+    fun `a frame theme retains its legacy shader override`() {
+        val subject = theme("grounds", format) { frame("outline", "frame/outline.png") }
 
+        assertEquals(listOf("shaders/core/text.vsh"), subject.vanillaOverrides())
+        assertEquals(1, subject.vanillaOverrides().count { it == "shaders/core/text.vsh" })
+        assertEquals(subject.vanillaOverrides(), written(subject, assets("frame/outline.png")))
+    }
+
+    @Test
+    fun `each claim is conditional on the feature that needs it`() {
         val bundles = theme("grounds", format) { bundleFiller() }
         assertTrue(bundles.vanillaOverrides().none { it.startsWith("shaders/") })
         assertEquals(bundles.vanillaOverrides(), written(bundles, assets()))
