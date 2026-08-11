@@ -17,6 +17,8 @@ import gg.grounds.resourcepack.api.VanillaPathPolicy
 import gg.grounds.resourcepack.builder.PackArtifact
 import gg.grounds.resourcepack.builder.ResourcePackComposer
 import gg.grounds.resourcepack.builder.ZipPackWriter
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.util.Properties
 import kotlin.io.path.deleteRecursively
@@ -325,6 +327,7 @@ object DemoTheme {
      */
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     fun rebuild(art: Path, out: Path): PackArtifact {
+        requireNonOverlappingPaths(art, out)
         out.deleteRecursively()
         out.createDirectories()
         val subject = current()
@@ -342,4 +345,23 @@ object DemoTheme {
     fun snippet(): String =
         "panel(\"$PANEL\", \"panels/shop.png\", $PANEL_W, $PANEL_H, " +
             "offsetX = $offsetX, offsetY = $offsetY)"
+}
+
+private fun requireNonOverlappingPaths(art: Path, out: Path) {
+    val source = canonicalPath(art)
+    val output = canonicalPath(out)
+    require(!source.startsWith(output) && !output.startsWith(source)) {
+        "Theme pack source $source and output $output must not overlap"
+    }
+}
+
+private fun canonicalPath(path: Path): Path {
+    var existing = path.toAbsolutePath().normalize()
+    val missing = mutableListOf<Path>()
+    while (!Files.exists(existing, NOFOLLOW_LINKS)) {
+        val name = existing.fileName ?: break
+        missing.add(name)
+        existing = existing.parent ?: break
+    }
+    return missing.asReversed().fold(existing.toRealPath()) { resolved, name -> resolved.resolve(name) }
 }

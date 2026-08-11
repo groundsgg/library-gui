@@ -3,14 +3,17 @@ package gg.grounds.gui.demo
 import java.nio.file.Path
 import java.nio.file.Files
 import java.security.MessageDigest
+import kotlin.io.path.createDirectory
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.test.AfterTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assumptions.assumeTrue
 
 /**
  * Pins the split the demo's whole tuning loop rests on: two of the three offsets live only in the
@@ -92,6 +95,57 @@ class DemoThemeTest {
     fun `rebuilding repeatedly succeeds, despite the generator refusing a populated directory`() {
         val out = createTempDirectory("demo-pack-reused")
         repeat(3) { DemoTheme.rebuild(art, out) }
+    }
+
+    @Test
+    fun `rebuild rejects equal source and output without deleting artwork`() {
+        val source = sourceWithSentinel()
+        val sentinel = source.resolve("sentinel.txt")
+
+        val failure = assertFailsWith<IllegalArgumentException> { DemoTheme.rebuild(source, source) }
+
+        assertTrue(sentinel.isRegularFile(), "rebuild must not delete its source artwork")
+        assertTrue("source" in failure.message.orEmpty(), failure.message)
+        assertTrue("output" in failure.message.orEmpty(), failure.message)
+    }
+
+    @Test
+    fun `rebuild rejects an output ancestor without deleting artwork`() {
+        val root = createTempDirectory("demo-pack-overlap")
+        val source = root.resolve("art").createDirectory()
+        val sentinel = source.resolve("sentinel.txt")
+        Files.writeString(sentinel, "must survive")
+
+        val failure = assertFailsWith<IllegalArgumentException> { DemoTheme.rebuild(source, root) }
+
+        assertTrue(sentinel.isRegularFile(), "rebuild must not delete an artwork descendant")
+        assertTrue("source" in failure.message.orEmpty(), failure.message)
+        assertTrue("output" in failure.message.orEmpty(), failure.message)
+    }
+
+    @Test
+    fun `rebuild rejects a symlink output alias without deleting artwork`() {
+        val source = sourceWithSentinel()
+        val alias = source.resolveSibling("art-alias")
+        try {
+            Files.createSymbolicLink(alias, source)
+        } catch (failure: UnsupportedOperationException) {
+            assumeTrue(false, "the active filesystem does not support symbolic links")
+        } catch (failure: java.nio.file.FileSystemException) {
+            assumeTrue(false, "the active filesystem does not permit symbolic links: ${failure.reason}")
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> { DemoTheme.rebuild(source, alias) }
+
+        assertTrue(source.resolve("sentinel.txt").isRegularFile())
+        assertTrue("source" in failure.message.orEmpty(), failure.message)
+        assertTrue("output" in failure.message.orEmpty(), failure.message)
+    }
+
+    private fun sourceWithSentinel(): Path {
+        val source = createTempDirectory("demo-pack-source")
+        Files.writeString(source.resolve("sentinel.txt"), "must survive")
+        return source
     }
 
     @Test

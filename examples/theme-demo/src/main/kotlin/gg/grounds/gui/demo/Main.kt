@@ -44,8 +44,7 @@ fun main() {
     val serverPort = (System.getenv("SERVER_PORT") ?: "25565").toInt()
 
     val host = PackHost(packPort)
-    val url = host.url(packHostName)
-    val packs = Packs(host, url, packRequired)
+    val packs = Packs(host, packHostName, packRequired)
     // Generate before binding the port. The JDK's HTTP dispatcher is a non-daemon thread, so a
     // failure between starting it and starting Minestom would leave a JVM that never exits, holding
     // the pack port with nothing listening for players.
@@ -91,7 +90,7 @@ fun main() {
     }
 
     registerCommands(packs)
-    printBanner(url, sha1, serverPort)
+    printBanner(packs.url, sha1, serverPort)
     try {
         server.start("0.0.0.0", serverPort)
     } catch (failure: Throwable) {
@@ -105,15 +104,18 @@ fun main() {
 /**
  * Holds the pack currently being served.
  *
- * Each rebuild gets a fresh pack id so a client can never match new bytes against a cached entry,
- * and `replace(true)` drops whatever it was holding before.
+ * The pack keeps a stable identity while every rebuild receives an immutable, hash-addressed URL.
+ * With `replace(false)`, old requests remain valid and never replace other server packs.
  */
 private class Packs(
     private val host: PackHost,
-    private val url: String,
+    private val hostName: String,
     private val required: Boolean,
 ) {
     @Volatile lateinit var request: ResourcePackRequest
+        private set
+
+    @Volatile lateinit var url: String
         private set
 
     /** Regenerates the pack from the current offsets, republishes it, and returns its SHA-1. */
@@ -128,14 +130,16 @@ private class Packs(
     private val PACK_ID: UUID =
         UUID.nameUUIDFromBytes("grounds:pack:${DemoTheme.NAMESPACE}".toByteArray())
 
+    @Synchronized
     fun rebuild(): String {
         val artifact = DemoTheme.rebuild(ART, OUT)
-        host.publish(artifact.path)
-        // The hash is of exactly the bytes the host now serves, so the two cannot drift — which
-        // matters, because a required pack whose hash is stale kicks every player who joins.
+        host.publish(artifact.path, artifact.sha1)
+        val versionedUrl = host.url(hostName, artifact.sha1)
+        // The snapshot is published before exposing the matching request, so both this URL and
+        // every older request URL retain their own exact bytes for the demo process lifetime.
         request =
             ResourcePackRequest.resourcePackRequest()
-                .packs(ResourcePackInfo.resourcePackInfo(PACK_ID, URI.create(url), artifact.sha1))
+                .packs(ResourcePackInfo.resourcePackInfo(PACK_ID, URI.create(versionedUrl), artifact.sha1))
                 .required(required)
                 // Never replace. A client can hold several server packs at once, and replacing
                 // drops every one it already has — including packs this server never sent. A
@@ -149,6 +153,7 @@ private class Packs(
                     },
                 )
                 .build()
+        url = versionedUrl
         return artifact.sha1
     }
 }
