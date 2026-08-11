@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Path
+import java.util.Locale
 import javax.imageio.ImageIO
 import kotlin.io.path.inputStream
 import kotlin.io.path.isRegularFile
@@ -69,4 +70,30 @@ internal fun themeClientAdvance(image: BufferedImage, scale: Int): Int {
         }
     }
     return (column + 1) * scale + 1
+}
+
+/** Substitutes the theme's declared colours into the text-marker shader palette. */
+internal fun withPalette(source: String, theme: Theme): String {
+    if (theme.colours.isEmpty()) return source
+    val entries =
+        theme.colours
+            .sortedBy { it.name }
+            .joinToString(", ") { colour ->
+                val (r, g, b) = listOf(16, 8, 0).map { shift -> (colour.rgb shr shift) and 0xFF }
+                String.format(
+                    Locale.ROOT,
+                    "vec3(%.5f, %.5f, %.5f)",
+                    r / 255.0,
+                    g / 255.0,
+                    b / 255.0,
+                )
+            }
+    val size = theme.colours.size
+    val replaced =
+        source.replace(
+            "const vec3 GROUNDS_PALETTE[1] = vec3[1](vec3(1.0));",
+            "const vec3 GROUNDS_PALETTE[$size] = vec3[$size]($entries);",
+        )
+    check(replaced != source) { "the bundled text.vsh no longer carries the palette placeholder" }
+    return replaced
 }
