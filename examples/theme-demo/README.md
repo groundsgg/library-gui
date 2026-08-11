@@ -29,20 +29,22 @@ use `replace(false)` so a rebuild does not discard unrelated server packs.
 | Command | Effect |
 | --- | --- |
 | `/gui` | Opens the calibrated themed GUI. |
+| `/overview` | Opens the marker and hover overview. |
 | `/hover` | Opens the hover-only comparison screen. |
 | `/glow` | Toggles the global slot glow and rebuilds/re-sends the pack. |
 | `/highlight` | Blanks or restores the vanilla highlight and rebuilds/re-sends the pack. |
+| `/tint` | Toggles runtime-only empty-tile tinting; reopen the screen, no pack rebuild. |
 | `/tune x <px>` | Changes the title offset; reopen the GUI, no pack download. |
 | `/tune y <px>` | Changes glyph ascent; rebuilds/re-sends the pack. |
 | `/tune show` | Prints a pasteable `panel(...)` declaration. |
-| `/tune reset` | Restores the theme defaults and rebuilds/re-sends the pack. |
+| `/tune reset` | Restores the tuning offset defaults and rebuilds/re-sends the pack. |
 | `/story`, `/market`, `/menu`, `/dialog`, `/ui` | Open the other GUI and dialog demonstrations. |
 | `/mapdemo` | Shows a per-player image sent as map data. |
 
 Do not send another rebuilding command while a pack request is pending: the demo
 refuses it so an in-flight required request is not discarded. `/tune y`,
-`/glow`, and `/highlight` need a fresh download; reopen the relevant GUI after
-the client has loaded it.
+`/tune reset`, `/glow`, and `/highlight` need a fresh download; reopen the
+relevant GUI after the client has loaded it.
 
 ## Hover and markers
 

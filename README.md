@@ -11,8 +11,10 @@ dependencies {
 
 ## Compatibility
 
-`library-gui` 0.2.x targets Minecraft 26.2 with Minestom `2026.07.22-26.2` and JVM 25.
-The host supplies Minestom; consumers must not shade a second copy.
+This migration branch targets Minecraft 26.2 with Minestom `2026.07.22-26.2`
+and JVM 25. The host supplies Minestom; consumers must not shade a second copy.
+The typed-contribution flow below is unreleased on this migration branch; the
+eventual `library-gui` release version has not yet been assigned.
 
 ## Basics
 
@@ -180,6 +182,16 @@ capability `grounds:text-marker-shader/v1` and must declare **exactly format
 `PackDefinition`, chooses its other contributions and policy, composes the
 complete pack, and writes the final ZIP artifact. This is also where it serves
 the artifact and couples the URL sent to clients to that artifact's SHA-1.
+
+This separate product/demo composition code needs the builder explicitly:
+
+```kotlin
+dependencies {
+    implementation("gg.grounds:resource-pack-builder:0.1.0")
+}
+```
+
+Ordinary `library-gui` consumers remain API-only and do not add the builder.
 
 ```kotlin
 import gg.grounds.gui.pack.toResourcePackFormat
