@@ -8,7 +8,6 @@ import gg.grounds.resourcepack.api.PackEntrySource
 import gg.grounds.resourcepack.api.PackPath
 import gg.grounds.resourcepack.api.RenderingCapability
 import java.nio.file.Path
-import javax.imageio.ImageIO
 import kotlin.io.path.isDirectory
 
 internal data class PlannedThemeEntry(
@@ -20,6 +19,11 @@ internal class ThemePackPlan private constructor(
     val entries: List<PlannedThemeEntry>,
     val provides: Set<RenderingCapability>,
 ) {
+    init {
+        val duplicate = entries.groupingBy { it.path }.eachCount().entries.firstOrNull { it.value > 1 }
+        check(duplicate == null) { "Duplicate planned theme asset path ${duplicate?.key?.value}" }
+    }
+
     val vanillaPaths: List<PackPath> = entries.map { it.path }.filter { it.isVanilla }
 
     fun materialize(assets: Path): List<PackEntry> {
@@ -54,20 +58,15 @@ internal class ThemePackPlan private constructor(
                         add(image(theme, target, texture) { picture -> validateTooltip(theme, tooltip.id, texture, tooltip.border, picture) })
                         add(
                             PlannedThemeEntry(path(theme, "$target.mcmeta")) { assets ->
-                                val picture = checkedImageFile(theme, assets, texture) { image ->
+                                val picture = checkedImage(theme, assets, texture) { image ->
                                     validateTooltip(theme, tooltip.id, texture, tooltip.border, image)
                                 }
-                                picture.openStream().use { stream ->
-                                    val image = ImageIO.read(stream)!!
-                                    generatedText(tooltipMcmeta(image.width, image.height, tooltip.border))
-                                }
+                                generatedText(tooltipMcmeta(picture.width, picture.height, tooltip.border))
                             }
                         )
                     }
                 }
             }.sortedBy { it.path }
-            val duplicate = entries.groupingBy { it.path }.eachCount().entries.firstOrNull { it.value > 1 }
-            check(duplicate == null) { "Duplicate planned theme asset path ${duplicate?.key?.value}" }
             return ThemePackPlan(entries, emptySet())
         }
 

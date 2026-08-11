@@ -6,7 +6,10 @@ import gg.grounds.resourcepack.api.ByteArrayEntrySource
 import gg.grounds.resourcepack.api.ContributionId
 import gg.grounds.resourcepack.api.FileEntrySource
 import gg.grounds.resourcepack.api.PackFormatRange as ResourcePackFormatRange
+import gg.grounds.resourcepack.api.PackPath
+import gg.grounds.resourcepack.api.RenderingCapability
 import java.awt.image.BufferedImage
+import java.lang.reflect.InvocationTargetException
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.imageio.ImageIO
@@ -15,12 +18,67 @@ import kotlin.io.path.createTempDirectory
 import kotlin.io.path.div
 import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ThemePackContributionTest {
+    @Test
+    fun `rejects duplicate complete planned paths`() {
+        val duplicate =
+            PlannedThemeEntry(PackPath.of("assets/grounds/font/gui.json")) { generatedText("font") }
+        val constructor =
+            ThemePackPlan::class.java.getDeclaredConstructor(List::class.java, Set::class.java)
+                .apply { isAccessible = true }
+
+        val invocation =
+            assertFailsWith<InvocationTargetException> {
+                constructor.newInstance(listOf(duplicate, duplicate), emptySet<RenderingCapability>())
+            }
+
+        assertTrue(
+            "assets/grounds/font/gui.json" in invocation.cause?.message.orEmpty(),
+            invocation.cause?.message.orEmpty(),
+        )
+    }
+
+    @Test
+    fun `generated PNG is byte backed and decodes without filesystem output`() {
+        val sourceTree = createTempDirectory("assets")
+        val before = tree(sourceTree)
+        val image = BufferedImage(2, 3, BufferedImage.TYPE_INT_ARGB).apply {
+            setRGB(1, 2, 0xFF102030.toInt())
+        }
+
+        val source = generatedPng(image)
+        val decoded = source.openStream().use { ImageIO.read(it) }
+
+        assertTrue(source is ByteArrayEntrySource)
+        assertEquals(2, decoded.width)
+        assertEquals(3, decoded.height)
+        assertEquals(0xFF102030.toInt(), decoded.getRGB(1, 2))
+        assertEquals(before, tree(sourceTree))
+    }
+
+    @Test
+    fun `wraps a truncated PNG decode failure with theme and source context`() {
+        val assets = createTempDirectory("assets")
+        val texture = "panels/broken.png"
+        val source = assets / texture
+        source.parent.createDirectories()
+        source.writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00))
+        val subject = theme("grounds", GuiPackFormat(88)) { panel("shop", texture, 176, 166) }
+
+        val failure = assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
+
+        assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
+        assertTrue(texture in failure.message.orEmpty(), failure.message.orEmpty())
+        assertTrue(source.toString() in failure.message.orEmpty(), failure.message.orEmpty())
+        assertTrue(failure.cause != null)
+    }
+
     @Test
     fun `materializes sorted typed entries for panels icons and tooltips without creating output`() {
         val assets = createTempDirectory("assets")
@@ -68,7 +126,10 @@ class ThemePackContributionTest {
         assertEquals("{\"model\":{\"type\":\"minecraft:model\",\"model\":\"grounds:item/coin\"}}", text(contribution, "assets/grounds/items/coin.json"))
         assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":24,\"height\":24,\"border\":4}}}", text(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_background.png.mcmeta"))
         assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":24,\"height\":24,\"border\":4}}}", text(contribution, "assets/grounds/textures/gui/sprites/tooltip/gold_frame.png.mcmeta"))
-        assertTrue("\"file\":\"grounds:gui/panels/shop.png\"" in text(contribution, "assets/grounds/font/gui.json"))
+        assertEquals(
+            """{"providers":[{"type":"space","advances":{"\ue000":1,"\ue001":-1,"\ue002":2,"\ue003":-2,"\ue004":4,"\ue005":-4,"\ue006":8,"\ue007":-8,"\ue008":16,"\ue009":-16,"\ue00a":32,"\ue00b":-32,"\ue00c":64,"\ue00d":-64,"\ue00e":128,"\ue00f":-128,"\ue010":256,"\ue011":-256,"\ue012":512,"\ue013":-512,"\ue014":1024,"\ue015":-1024}},{"type":"bitmap","file":"grounds:gui/panels/shop.png","ascent":13,"height":166,"chars":["\ue016"]}]}""",
+            text(contribution, "assets/grounds/font/gui.json"),
+        )
     }
 
     @Test
@@ -84,8 +145,9 @@ class ThemePackContributionTest {
         png(assets, "tooltips/a.png", 6, 6)
         png(assets, "tooltips/b.png", 6, 6)
 
+        val rootFailure = assertFailsWith<IllegalArgumentException> { missing.toPackContribution(missingRoot) }
         listOf(
-            assertFailsWith<IllegalArgumentException> { missing.toPackContribution(missingRoot) },
+            rootFailure,
             assertFailsWith<IllegalArgumentException> { missing.toPackContribution(assets) },
             assertFailsWith<IllegalArgumentException> { wrongSize.toPackContribution(assets) },
             assertFailsWith<IllegalArgumentException> { transparent.toPackContribution(assets) },
@@ -93,6 +155,7 @@ class ThemePackContributionTest {
         ).forEach { failure ->
             assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
         }
+        assertTrue(missingRoot.toString() in rootFailure.message.orEmpty(), rootFailure.message.orEmpty())
         assertTrue("panels/missing.png" in assertFailsWith<IllegalArgumentException> { missing.toPackContribution(assets) }.message.orEmpty())
         assertTrue("panels/wrong.png" in assertFailsWith<IllegalArgumentException> { wrongSize.toPackContribution(assets) }.message.orEmpty())
         assertTrue("panels/soft.png" in assertFailsWith<IllegalArgumentException> { transparent.toPackContribution(assets) }.message.orEmpty())

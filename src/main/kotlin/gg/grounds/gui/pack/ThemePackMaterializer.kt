@@ -18,17 +18,34 @@ internal fun checkedImageFile(
     texture: String,
     validate: (BufferedImage) -> Unit = {},
 ): PackEntrySource {
+    checkedImage(theme, assets, texture, validate)
+    return FileEntrySource(assets.resolve(texture))
+}
+
+internal fun checkedImage(
+    theme: Theme,
+    assets: Path,
+    texture: String,
+    validate: (BufferedImage) -> Unit = {},
+): BufferedImage {
     val source = assets.resolve(texture)
     require(source.isRegularFile()) {
         "Theme '${theme.namespace}' texture '$texture' source path $source was not found"
     }
     val image =
-        source.inputStream().buffered().use { ImageIO.read(it) }
+        try {
+            source.inputStream().buffered().use { ImageIO.read(it) }
+        } catch (failure: Exception) {
+            throw IllegalArgumentException(
+                "Theme '${theme.namespace}' texture '$texture' source path $source is not a readable image",
+                failure,
+            )
+        }
             ?: throw IllegalArgumentException(
                 "Theme '${theme.namespace}' texture '$texture' source path $source is not a readable image"
             )
     validate(image)
-    return FileEntrySource(source)
+    return image
 }
 
 internal fun generatedText(value: String): PackEntrySource = ByteArrayEntrySource(value.toByteArray(UTF_8))
