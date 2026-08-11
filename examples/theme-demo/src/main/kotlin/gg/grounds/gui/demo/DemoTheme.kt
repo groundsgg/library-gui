@@ -1,9 +1,9 @@
 package gg.grounds.gui.demo
 
-import gg.grounds.gui.pack.writePack
-import gg.grounds.gui.pack.zipPack
 import gg.grounds.gui.demo.art.MENU_CAP
 import gg.grounds.gui.demo.art.MENU_MIDDLE
+import gg.grounds.gui.pack.toPackContribution
+import gg.grounds.gui.pack.toResourcePackFormat
 import gg.grounds.gui.theme.MeterAxis
 import gg.grounds.gui.theme.PackFormat
 import gg.grounds.gui.theme.TITLE_INSET
@@ -11,11 +11,18 @@ import gg.grounds.gui.theme.Sequence
 import gg.grounds.gui.theme.Theme
 import gg.grounds.gui.theme.ThemeBuilder
 import gg.grounds.gui.theme.theme
+import gg.grounds.resourcepack.api.PackDefinition
+import gg.grounds.resourcepack.api.PackPolicy
+import gg.grounds.resourcepack.api.VanillaPathPolicy
+import gg.grounds.resourcepack.builder.PackArtifact
+import gg.grounds.resourcepack.builder.ResourcePackComposer
+import gg.grounds.resourcepack.builder.ZipPackWriter
 import java.nio.file.Path
 import java.util.Properties
 import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
+import kotlin.io.path.createDirectories
 
 /** Where the demo's artwork lives, relative to the module the server is started from. */
 internal val ART: Path = Path.of("art")
@@ -193,7 +200,7 @@ object DemoTheme {
 
     /** The theme as currently tuned. */
     fun current(): Theme =
-        theme(NAMESPACE, PackFormat(88, minInclusive = 84, maxInclusive = 88)) {
+        theme(NAMESPACE, PackFormat(88)) {
             description = "library-gui theme demo"
             panel(PANEL, "panels/shop.png", PANEL_W, PANEL_H, offsetX = offsetX, offsetY = offsetY)
             listOf("screen_shop" to (176 to 222), "screen_toolbar" to (176 to 133),
@@ -317,12 +324,18 @@ object DemoTheme {
      * after the first one.
      */
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
-    fun rebuild(art: Path, out: Path): Pair<Path, String> {
+    fun rebuild(art: Path, out: Path): PackArtifact {
         out.deleteRecursively()
-        val pack = out.resolve("pack")
-        val zip = out.resolve("theme-demo.zip")
-        writePack(current(), art, pack)
-        return zip to zipPack(pack, zip)
+        out.createDirectories()
+        val subject = current()
+        val definition =
+            PackDefinition(
+                description = subject.description,
+                format = subject.packFormat.toResourcePackFormat(),
+                policy = PackPolicy(vanillaPaths = VanillaPathPolicy.ALLOW_CLAIMED),
+            )
+        val composed = ResourcePackComposer().compose(definition, listOf(subject.toPackContribution(art)))
+        return ZipPackWriter().write(composed, out.resolve("theme-demo.zip"))
     }
 
     /** The tuned values, shaped so they can be pasted straight into a theme declaration. */

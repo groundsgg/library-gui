@@ -31,6 +31,7 @@ repositories {
 
 dependencies {
     implementation(project(":"))
+    implementation("gg.grounds:resource-pack-builder:0.1.0")
     // The library declares Minestom compileOnly, so a runnable example has to bring a real one.
     implementation("net.minestom:minestom:2026.07.22-26.2")
     runtimeOnly("org.slf4j:slf4j-simple:2.0.18")

@@ -129,13 +129,13 @@ private class Packs(
         UUID.nameUUIDFromBytes("grounds:pack:${DemoTheme.NAMESPACE}".toByteArray())
 
     fun rebuild(): String {
-        val (zip, sha1) = DemoTheme.rebuild(ART, OUT)
-        host.publish(zip)
+        val artifact = DemoTheme.rebuild(ART, OUT)
+        host.publish(artifact.path)
         // The hash is of exactly the bytes the host now serves, so the two cannot drift — which
         // matters, because a required pack whose hash is stale kicks every player who joins.
         request =
             ResourcePackRequest.resourcePackRequest()
-                .packs(ResourcePackInfo.resourcePackInfo(PACK_ID, URI.create(url), sha1))
+                .packs(ResourcePackInfo.resourcePackInfo(PACK_ID, URI.create(url), artifact.sha1))
                 .required(required)
                 // Never replace. A client can hold several server packs at once, and replacing
                 // drops every one it already has — including packs this server never sent. A
@@ -149,7 +149,7 @@ private class Packs(
                     },
                 )
                 .build()
-        return sha1
+        return artifact.sha1
     }
 }
 

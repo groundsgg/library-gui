@@ -1,10 +1,14 @@
 package gg.grounds.gui.demo
 
 import java.nio.file.Path
+import java.nio.file.Files
+import java.security.MessageDigest
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.isRegularFile
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertContentEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -22,7 +26,42 @@ class DemoThemeTest {
     }
 
     /** Rebuilds into a throwaway directory and returns the pack's hash. */
-    private fun hash(): String = DemoTheme.rebuild(art, createTempDirectory("demo-pack")).second
+    private fun hash(): String = DemoTheme.rebuild(art, createTempDirectory("demo-pack")).sha1
+
+    @Test
+    fun `theme declares the exact shader pack format`() {
+        val format = DemoTheme.current().packFormat
+
+        assertEquals(88, format.format)
+        assertEquals(88, format.minInclusive)
+        assertEquals(88, format.maxInclusive)
+    }
+
+    @Test
+    fun `rebuild reports hashes and size for the served zip`() {
+        val artifact = DemoTheme.rebuild(art, createTempDirectory("demo-pack-artifact"))
+
+        assertTrue(artifact.path.isRegularFile())
+        assertEquals(40, artifact.sha1.length)
+        assertEquals(64, artifact.sha256.length)
+        assertEquals(Files.size(artifact.path), artifact.size)
+        assertEquals(artifact.sha1, sha1(Files.readAllBytes(artifact.path)))
+    }
+
+    @Test
+    fun `rebuilding the same theme produces identical zip bytes and hashes`() {
+        val first = DemoTheme.rebuild(art, createTempDirectory("demo-pack-first"))
+        val second = DemoTheme.rebuild(art, createTempDirectory("demo-pack-second"))
+
+        assertContentEquals(Files.readAllBytes(first.path), Files.readAllBytes(second.path))
+        assertEquals(first.sha1, second.sha1)
+        assertEquals(first.sha256, second.sha256)
+    }
+
+    private fun sha1(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-1")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
 
     @Test
     fun `horizontal tuning never reaches the pack`() {
