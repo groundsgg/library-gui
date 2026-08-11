@@ -8,6 +8,7 @@ import gg.grounds.resourcepack.api.FileEntrySource
 import gg.grounds.resourcepack.api.PackFormatRange as ResourcePackFormatRange
 import gg.grounds.resourcepack.api.PackPath
 import gg.grounds.resourcepack.api.RenderingCapability
+import gg.grounds.resourcepack.testkit.assertVanillaClaimsMatch
 import java.awt.image.BufferedImage
 import java.lang.reflect.InvocationTargetException
 import java.nio.file.Files
@@ -181,6 +182,93 @@ class ThemePackContributionTest {
         assertEquals(emptySet(), contribution.vanillaClaims)
         assertEquals(emptySet(), contribution.provides)
         assertEquals(emptySet(), contribution.requires)
+    }
+
+    @Test
+    fun `contribution owns every vanilla slot highlight and bundle asset`() {
+        val assets = createTempDirectory("assets")
+        val back = png(assets, "highlight/back.png", 8, 8)
+        val front = png(assets, "highlight/front.png", 8, 8)
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                slotHighlight("highlight/back.png", "highlight/front.png")
+                bundleFiller()
+            }
+
+        val contribution = subject.toPackContribution(assets)
+
+        assertVanillaClaimsMatch(contribution)
+        assertEquals(
+            setOf(
+                "assets/minecraft/lang/en_us.json",
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png",
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta",
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png",
+                "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png.mcmeta",
+                "assets/minecraft/textures/gui/sprites/container/slot_highlight_back.png",
+                "assets/minecraft/textures/gui/sprites/container/slot_highlight_front.png",
+            ),
+            contribution.vanillaClaims.map { it.path.value }.toSet(),
+        )
+        assertEquals(7, contribution.vanillaClaims.size)
+        assertEquals(
+            contribution.vanillaClaims
+                .map { it.path.value.removePrefix("assets/minecraft/") }
+                .sorted(),
+            subject.vanillaOverrides(),
+        )
+
+        val vanillaEntries = contribution.entries.filter { it.path.isVanilla }
+        assertEquals(7, vanillaEntries.size)
+        assertTrue(
+            vanillaEntries
+                .filter { it.path.value.endsWith("slot_highlight_back.png") || it.path.value.endsWith("slot_highlight_front.png") }
+                .all { it.source is FileEntrySource },
+        )
+        assertTrue(
+            vanillaEntries
+                .filterNot { it.path.value.endsWith("slot_highlight_back.png") || it.path.value.endsWith("slot_highlight_front.png") }
+                .all { it.source is ByteArrayEntrySource },
+        )
+        assertEquals(back.toList(), bytes(contribution, "assets/minecraft/textures/gui/sprites/container/slot_highlight_back.png").toList())
+        assertEquals(front.toList(), bytes(contribution, "assets/minecraft/textures/gui/sprites/container/slot_highlight_front.png").toList())
+        assertEquals("{\"item.minecraft.bundle.empty\":\"\",\"item.minecraft.bundle.empty.description\":\"\"}", text(contribution, "assets/minecraft/lang/en_us.json"))
+        assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":12,\"height\":12,\"border\":2}}}", text(contribution, "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta"))
+        assertEquals("{\"gui\":{\"scaling\":{\"type\":\"nine_slice\",\"width\":6,\"height\":6,\"border\":2}}}", text(contribution, "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png.mcmeta"))
+        listOf(
+            "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_border.png" to 12,
+            "assets/minecraft/textures/gui/sprites/container/bundle/bundle_progressbar_fill.png" to 6,
+        ).forEach { (path, size) ->
+            val image = bytes(contribution, path).inputStream().use(ImageIO::read)
+            assertEquals(size, image.width)
+            assertEquals(size, image.height)
+            assertEquals(0, image.getRGB(0, 0))
+        }
+        val generated = createTempDirectory("pack")
+        writePack(subject, assets, generated)
+        vanillaEntries.forEach { entry ->
+            assertTrue(
+                Files.readAllBytes(generated.resolve(entry.path.value)).contentEquals(bytes(contribution, entry.path.value)),
+                entry.path.value,
+            )
+        }
+    }
+
+    @Test
+    fun `rejects a non-square slot highlight with source context`() {
+        val assets = createTempDirectory("assets")
+        png(assets, "highlight/back.png", 8, 7)
+        png(assets, "highlight/front.png", 8, 8)
+        val subject =
+            theme("grounds", GuiPackFormat(88)) {
+                slotHighlight("highlight/back.png", "highlight/front.png")
+            }
+
+        val failure = assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
+
+        assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
+        assertTrue("highlight/back.png" in failure.message.orEmpty(), failure.message.orEmpty())
+        assertTrue("8x7" in failure.message.orEmpty(), failure.message.orEmpty())
     }
 
     @Test

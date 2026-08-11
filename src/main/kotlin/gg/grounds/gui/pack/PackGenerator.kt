@@ -506,25 +506,6 @@ private fun sha1(file: Path): String {
  * test can hold the two against each other.
  */
 fun Theme.vanillaOverrides(): List<String> =
-    buildList {
-            // The shader is what relocates markers; without frames there is nothing to relocate.
-            if (frames.isNotEmpty()) add("shaders/core/text.vsh")
-            slotHighlight?.let {
-                add("textures/gui/sprites/container/slot_highlight_back.png")
-                add("textures/gui/sprites/container/slot_highlight_front.png")
-            }
-            if (bundleFiller) {
-                // Each sprite ships its own .mcmeta, and both count: a pack that claims the png and
-                // not the meta leaves the client reading another pack's animation for its texture.
-                // This pair is what the first hand-written version of this list missed, and the
-                // test comparing claim against output caught it on its first run.
-                listOf("bundle_progressbar_border", "bundle_progressbar_fill").forEach { sprite ->
-                    add("textures/gui/sprites/container/bundle/$sprite.png")
-                    add("textures/gui/sprites/container/bundle/$sprite.png.mcmeta")
-                }
-                // Language files merge per key, so this replaces exactly two strings — but a pack
-                // that ships it at all owns the file as far as another pack is concerned.
-                add("lang/en_us.json")
-            }
-        }
-        .sorted()
+    ThemePackPlan.from(this)
+        .vanillaPaths
+        .map { it.value.removePrefix("assets/minecraft/") }

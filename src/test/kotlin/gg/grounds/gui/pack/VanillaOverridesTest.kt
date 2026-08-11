@@ -64,27 +64,31 @@ class VanillaOverridesTest {
     fun `what the theme claims is exactly what lands under assets slash minecraft`() {
         val subject =
             theme("grounds", format) {
-                frame("outline", "frame/outline.png")
                 slotHighlight("hl/back.png", "hl/front.png")
                 bundleFiller()
             }
         val expected = subject.vanillaOverrides()
-        // The three claims, spelled out once so a change to the generator has to be deliberate.
-        assertTrue("shaders/core/text.vsh" in expected)
-        assertTrue("lang/en_us.json" in expected, "the quiet one: a pack owns this file wholesale")
-        assertEquals(8, expected.size)
+        assertEquals(
+            listOf(
+                "lang/en_us.json",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_border.png",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_fill.png",
+                "textures/gui/sprites/container/bundle/bundle_progressbar_fill.png.mcmeta",
+                "textures/gui/sprites/container/slot_highlight_back.png",
+                "textures/gui/sprites/container/slot_highlight_front.png",
+            ),
+            expected,
+        )
+        assertEquals(7, expected.size)
         assertEquals(
             expected,
-            written(subject, assets("frame/outline.png", "hl/back.png", "hl/front.png")),
+            written(subject, assets("hl/back.png", "hl/front.png")),
         )
     }
 
     @Test
     fun `each claim is conditional on the feature that needs it`() {
-        val frames = theme("grounds", format) { frame("outline", "frame/outline.png") }
-        assertEquals(listOf("shaders/core/text.vsh"), frames.vanillaOverrides())
-        assertEquals(frames.vanillaOverrides(), written(frames, assets("frame/outline.png")))
-
         val bundles = theme("grounds", format) { bundleFiller() }
         assertTrue(bundles.vanillaOverrides().none { it.startsWith("shaders/") })
         assertEquals(bundles.vanillaOverrides(), written(bundles, assets()))

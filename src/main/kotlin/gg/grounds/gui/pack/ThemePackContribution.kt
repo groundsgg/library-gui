@@ -6,6 +6,7 @@ import gg.grounds.resourcepack.api.ContributionId
 import gg.grounds.resourcepack.api.PackContribution
 import gg.grounds.resourcepack.api.PackFormat as ResourcePackFormat
 import gg.grounds.resourcepack.api.PackFormatRange as ResourcePackFormatRange
+import gg.grounds.resourcepack.api.VanillaPathClaim
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 
@@ -24,6 +25,7 @@ fun Theme.toPackContribution(assets: Path): PackContribution {
         supportedFormats = packFormat.toResourcePackFormat().range,
         entries = plan.materialize(assets),
         provides = plan.provides,
+        vanillaClaims = plan.vanillaPaths.map(::VanillaPathClaim),
     )
 }
 

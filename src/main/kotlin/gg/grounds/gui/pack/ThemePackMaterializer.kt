@@ -56,6 +56,9 @@ internal fun generatedPng(image: BufferedImage): PackEntrySource {
     return ByteArrayEntrySource(bytes.toByteArray())
 }
 
+internal fun generatedBlankPng(size: Int): PackEntrySource =
+    generatedPng(BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB))
+
 internal fun themeClientAdvance(image: BufferedImage, scale: Int): Int {
     var column = image.width - 1
     if (image.colorModel.hasAlpha()) {

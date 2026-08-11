@@ -24,7 +24,7 @@ internal class ThemePackPlan private constructor(
         check(duplicate == null) { "Duplicate planned theme asset path ${duplicate?.key?.value}" }
     }
 
-    val vanillaPaths: List<PackPath> = entries.map { it.path }.filter { it.isVanilla }
+    val vanillaPaths: List<PackPath> = entries.map { it.path }.filter { it.isVanilla }.sorted()
 
     fun materialize(assets: Path): List<PackEntry> {
         require(assets.isDirectory()) {
@@ -66,11 +66,33 @@ internal class ThemePackPlan private constructor(
                         )
                     }
                 }
+                if (theme.bundleFiller) {
+                    listOf("bundle_progressbar_border" to 12, "bundle_progressbar_fill" to 6).forEach { (name, size) ->
+                        val target = "textures/gui/sprites/container/bundle/$name.png"
+                        add(PlannedThemeEntry(vanillaPath(target)) { generatedBlankPng(size) })
+                        add(
+                            PlannedThemeEntry(vanillaPath("$target.mcmeta")) {
+                                generatedText(bundleMcmeta(size))
+                            }
+                        )
+                    }
+                    add(
+                        PlannedThemeEntry(vanillaPath("lang/en_us.json")) {
+                            generatedText(bundleLanguageJson())
+                        }
+                    )
+                }
+                theme.slotHighlight?.let { highlight ->
+                    add(vanillaImage(theme, "textures/gui/sprites/container/slot_highlight_back.png", highlight.back))
+                    add(vanillaImage(theme, "textures/gui/sprites/container/slot_highlight_front.png", highlight.front))
+                }
             }.sortedBy { it.path }
             return ThemePackPlan(entries, emptySet())
         }
 
         private fun path(theme: Theme, value: String): PackPath = PackPath.of("assets/${theme.namespace}/$value")
+
+        private fun vanillaPath(value: String): PackPath = PackPath.of("assets/minecraft/$value")
 
         private fun text(theme: Theme, value: String, contents: String): PlannedThemeEntry =
             PlannedThemeEntry(path(theme, value)) { generatedText(contents) }
@@ -81,6 +103,17 @@ internal class ThemePackPlan private constructor(
             texture: String,
             validate: (java.awt.image.BufferedImage) -> Unit = {},
         ): PlannedThemeEntry = PlannedThemeEntry(path(theme, value)) { assets -> checkedImageFile(theme, assets, texture, validate) }
+
+        private fun vanillaImage(theme: Theme, value: String, texture: String): PlannedThemeEntry =
+            PlannedThemeEntry(vanillaPath(value)) { assets ->
+                checkedImageFile(theme, assets, texture) { image -> validateSlotHighlight(theme, texture, image) }
+            }
+    }
+}
+
+private fun validateSlotHighlight(theme: Theme, texture: String, image: java.awt.image.BufferedImage) {
+    require(image.width == image.height) {
+        "Theme '${theme.namespace}' slot highlight source path '$texture' is ${image.width}x${image.height}; the client draws it as a square, so the artwork has to be one"
     }
 }
 
@@ -137,4 +170,24 @@ private fun tooltipMcmeta(width: Int, height: Int, border: Int): String =
                 "border" to Json.number(border),
             )
         )
+    )
+
+private fun bundleMcmeta(size: Int): String =
+    Json.obj(
+        "gui" to
+            Json.obj(
+                "scaling" to
+                    Json.obj(
+                        "type" to Json.string("nine_slice"),
+                        "width" to Json.number(size),
+                        "height" to Json.number(size),
+                        "border" to Json.number(2),
+                    )
+            )
+    )
+
+private fun bundleLanguageJson(): String =
+    Json.obj(
+        "item.minecraft.bundle.empty" to Json.string(""),
+        "item.minecraft.bundle.empty.description" to Json.string(""),
     )
