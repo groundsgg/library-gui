@@ -2,6 +2,8 @@ package gg.grounds.gui.demo
 
 import java.nio.file.Path
 import java.nio.file.Files
+import java.nio.file.AccessDeniedException
+import java.nio.file.FileSystemException
 import java.security.MessageDigest
 import kotlin.io.path.createDirectory
 import kotlin.io.path.createTempDirectory
@@ -124,22 +126,65 @@ class DemoThemeTest {
     }
 
     @Test
-    fun `rebuild rejects a symlink output alias without deleting artwork`() {
+    fun `rebuild rejects an output descendant without deleting artwork`() {
         val source = sourceWithSentinel()
-        val alias = source.resolveSibling("art-alias")
-        try {
-            Files.createSymbolicLink(alias, source)
-        } catch (failure: UnsupportedOperationException) {
-            assumeTrue(false, "the active filesystem does not support symbolic links")
-        } catch (failure: java.nio.file.FileSystemException) {
-            assumeTrue(false, "the active filesystem does not permit symbolic links: ${failure.reason}")
+        val sentinel = source.resolve("sentinel.txt")
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            DemoTheme.rebuild(source, source.resolve("generated-pack"))
         }
 
-        val failure = assertFailsWith<IllegalArgumentException> { DemoTheme.rebuild(source, alias) }
-
-        assertTrue(source.resolve("sentinel.txt").isRegularFile())
+        assertTrue(sentinel.isRegularFile(), "rebuild must not delete an artwork ancestor")
         assertTrue("source" in failure.message.orEmpty(), failure.message)
         assertTrue("output" in failure.message.orEmpty(), failure.message)
+    }
+
+    @Test
+    fun `rebuild rejects a normalized textual output alias without deleting artwork`() {
+        val root = createTempDirectory("demo-pack-normalized")
+        val source = root.resolve("art").createDirectory()
+        val sentinel = source.resolve("sentinel.txt")
+        Files.writeString(sentinel, "must survive")
+        val textualAlias = root.resolve("art").resolve("..").resolve("art")
+
+        val failure = assertFailsWith<IllegalArgumentException> { DemoTheme.rebuild(source, textualAlias) }
+
+        assertTrue(sentinel.isRegularFile(), "rebuild must not delete a normalized source alias")
+        assertTrue("source" in failure.message.orEmpty(), failure.message)
+        assertTrue("output" in failure.message.orEmpty(), failure.message)
+    }
+
+    @Test
+    fun `rebuild rejects a symlink output alias without deleting artwork`() {
+        val root = createTempDirectory("demo-pack-symlink")
+        val source = root.resolve("art").createDirectory()
+        val sentinel = source.resolve("sentinel.txt")
+        Files.writeString(sentinel, "must survive")
+        val alias = root.resolve("art-alias")
+        try {
+            try {
+                Files.createSymbolicLink(alias, source)
+            } catch (failure: UnsupportedOperationException) {
+                assumeTrue(false, "the active filesystem does not support symbolic links")
+            } catch (failure: SecurityException) {
+                assumeTrue(false, "the active environment forbids symbolic links: ${failure.message}")
+            } catch (failure: AccessDeniedException) {
+                assumeTrue(false, "the active filesystem denies symbolic links: ${failure.reason}")
+            } catch (failure: FileSystemException) {
+                if (failure.reason in setOf("Operation not permitted", "A required privilege is not held by the client.")) {
+                    assumeTrue(false, "the active environment lacks symlink privilege: ${failure.reason}")
+                }
+                throw failure
+            }
+
+            val failure = assertFailsWith<IllegalArgumentException> { DemoTheme.rebuild(source, alias) }
+
+            assertTrue(sentinel.isRegularFile())
+            assertTrue("source" in failure.message.orEmpty(), failure.message)
+            assertTrue("output" in failure.message.orEmpty(), failure.message)
+        } finally {
+            Files.deleteIfExists(alias)
+        }
     }
 
     private fun sourceWithSentinel(): Path {
