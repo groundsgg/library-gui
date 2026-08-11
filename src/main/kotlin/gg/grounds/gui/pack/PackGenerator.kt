@@ -506,6 +506,14 @@ private fun sha1(file: Path): String {
  * test can hold the two against each other.
  */
 fun Theme.vanillaOverrides(): List<String> =
-    ThemePackPlan.from(this)
-        .vanillaPaths
-        .map { it.value.removePrefix("assets/minecraft/") }
+    buildList {
+            addAll(
+                ThemePackPlan.from(this@vanillaOverrides)
+                    .vanillaPaths
+                    .map { it.value.removePrefix("assets/minecraft/") }
+            )
+            // Temporary legacy compatibility bridge: writePack still ships this frame shader until
+            // Task 4 moves it into ThemePackPlan after external PR #25 merges. Remove this then.
+            if (frames.isNotEmpty()) add("shaders/core/text.vsh")
+        }
+        .sorted()

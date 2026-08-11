@@ -64,6 +64,7 @@ class VanillaOverridesTest {
     fun `what the theme claims is exactly what lands under assets slash minecraft`() {
         val subject =
             theme("grounds", format) {
+                frame("outline", "frame/outline.png")
                 slotHighlight("hl/back.png", "hl/front.png")
                 bundleFiller()
             }
@@ -71,6 +72,7 @@ class VanillaOverridesTest {
         assertEquals(
             listOf(
                 "lang/en_us.json",
+                "shaders/core/text.vsh",
                 "textures/gui/sprites/container/bundle/bundle_progressbar_border.png",
                 "textures/gui/sprites/container/bundle/bundle_progressbar_border.png.mcmeta",
                 "textures/gui/sprites/container/bundle/bundle_progressbar_fill.png",
@@ -80,11 +82,19 @@ class VanillaOverridesTest {
             ),
             expected,
         )
-        assertEquals(7, expected.size)
+        assertEquals(8, expected.size)
         assertEquals(
             expected,
-            written(subject, assets("hl/back.png", "hl/front.png")),
+            written(subject, assets("frame/outline.png", "hl/back.png", "hl/front.png")),
         )
+    }
+
+    @Test
+    fun `a frame theme retains its legacy shader override`() {
+        val subject = theme("grounds", format) { frame("outline", "frame/outline.png") }
+
+        assertEquals(listOf("shaders/core/text.vsh"), subject.vanillaOverrides())
+        assertEquals(subject.vanillaOverrides(), written(subject, assets("frame/outline.png")))
     }
 
     @Test
