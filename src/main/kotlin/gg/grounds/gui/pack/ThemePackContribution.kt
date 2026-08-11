@@ -17,11 +17,13 @@ fun GuiPackFormat.toResourcePackFormat(): ResourcePackFormat =
 
 fun Theme.toPackContribution(assets: Path): PackContribution {
     requireShaderFormat()
-    require(assets.isDirectory()) { "Theme '$namespace' asset root $assets is not a directory" }
+    require(assets.isDirectory()) { "Theme '$namespace' asset root source path $assets is not a directory" }
+    val plan = ThemePackPlan.from(this)
     return PackContribution(
         id = ContributionId.of("$namespace:gui"),
         supportedFormats = packFormat.toResourcePackFormat().range,
-        entries = emptyList(),
+        entries = plan.materialize(assets),
+        provides = plan.provides,
     )
 }
 
