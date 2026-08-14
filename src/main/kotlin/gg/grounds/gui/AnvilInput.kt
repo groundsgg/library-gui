@@ -1,5 +1,6 @@
 package gg.grounds.gui
 
+import gg.grounds.gui.bedrock.BedrockForms
 import net.kyori.adventure.text.Component
 import net.minestom.server.entity.Player
 import net.minestom.server.event.EventNode
@@ -19,7 +20,7 @@ import net.minestom.server.item.Material
  */
 class AnvilInput(
     player: Player,
-    title: Component,
+    private val title: Component,
     initial: String = "",
     private val confirmLabel: Component = Component.text("Confirm"),
     private val onConfirm: (String) -> Unit,
@@ -45,6 +46,34 @@ class AnvilInput(
         // one place where CUSTOM_NAME, not ITEM_NAME, is the point).
         item(0, ItemStack.of(Material.PAPER).withCustomName(Component.text(initial)))
         setButton(2, confirm)
+    }
+
+    /**
+     * On Bedrock this is a native text-input form instead of an anvil.
+     *
+     * That is the one place where Bedrock is served better than Java: the anvil path relies on the
+     * client sending its rename field on roughly every keystroke, and only once slot 0 holds an
+     * item. A form input has neither constraint. See [BedrockForms] — and call
+     * [BedrockForms.install] once at startup, or the prompt never answers.
+     */
+    override fun open() {
+        if (!BedrockForms.isBedrock(player)) {
+            super.open()
+            return
+        }
+        BedrockForms.textInput(
+            player = player,
+            title = title,
+            label = confirmLabel,
+            initial = input,
+        ) { answer ->
+            // Dismissing the form is the same as closing the anvil without confirming: nothing
+            // happens. Only a real answer calls back, which is what the Java path does too.
+            if (answer != null) {
+                input = answer
+                onConfirm(answer)
+            }
+        }
     }
 
     override fun configureNode(node: EventNode<EntityEvent>) {
