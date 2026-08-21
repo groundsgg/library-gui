@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/groundsgg/library-gui/compare/v0.6.0...v0.7.0) (2026-08-21)
+
+
+### Features
+
+* **bedrock:** render confirm and text input as native forms ([#28](https://github.com/groundsgg/library-gui/issues/28)) ([3262acf](https://github.com/groundsgg/library-gui/commit/3262acf617364a17ae4fce8a147ac8bb0b92d3f4))
+
 ## [0.6.0](https://github.com/groundsgg/library-gui/compare/v0.5.0...v0.6.0) (2026-08-11)
 
 
