@@ -217,6 +217,37 @@ class MenuTest {
     }
 
     @Test
+    fun `actions are declared apart from the entries`() {
+        val builder =
+            MenuBuilder().apply {
+                entry("lobby-1")
+                entry("lobby-2")
+                action("regions") { label = Component.text("Regions") }
+                action("here")
+            }
+
+        assertEquals(listOf("lobby-1", "lobby-2"), builder.build().map { it.id })
+        assertEquals(listOf("regions", "here"), builder.buildActions().map { it.id })
+    }
+
+    @Test
+    fun `an action renders like an entry does`() {
+        MinecraftServer.init()
+        val action =
+            menuActions {
+                    action("back") {
+                        label = Component.text("Back")
+                        description(Component.text("To the lobbies"))
+                        icon = Material.ARROW
+                    }
+                }
+                .single()
+
+        assertEquals(Material.ARROW, Menu.itemFor(action).material())
+        assertEquals("Back\nTo the lobbies", plain(Menu.formLabel(action)))
+    }
+
+    @Test
     fun `a menu cannot be grouped and flat at once`() {
         val builder =
             MenuBuilder().apply {

@@ -32,6 +32,7 @@ internal constructor(
     val title: Component,
     entries: List<MenuEntry>,
     groups: List<MenuGroup>,
+    actions: List<MenuEntry>,
     private val rows: Int,
 ) {
 
@@ -40,6 +41,13 @@ internal constructor(
 
     /** The tabs, when the menu has any. Empty for a flat menu. */
     var groups: List<MenuGroup> = groups
+        private set
+
+    /**
+     * What sits beside the list rather than in it: a way back, a way to a second screen, a line
+     * about where the player currently is.
+     */
+    var actions: List<MenuEntry> = actions
         private set
 
     private var paged: PagedGui<MenuEntry>? = null
@@ -72,7 +80,10 @@ internal constructor(
                 ) {
                     navigation()
                 }
-                .also { it.open() }
+                .also {
+                    drawActions(it)
+                    it.open()
+                }
     }
 
     /**
@@ -96,6 +107,7 @@ internal constructor(
                 }
                 .also {
                     drawTabs(it)
+                    drawActions(it)
                     it.open()
                 }
     }
@@ -121,8 +133,11 @@ internal constructor(
             player = player,
             title = title,
             content = Component.empty(),
-            buttons = groups.map(::groupLabel),
+            buttons = groups.map(::groupLabel) + actions.map(::formLabel),
         ) { index ->
+            if (index != null && index >= groups.size) {
+                return@simple select(actions[index - groups.size])
+            }
             // A tab row has no equivalent on a form, so a group becomes its own screen. Dismissing
             // the first one is the same "chose nothing" the chest answers when it is closed.
             index?.let { openEntryForm(groups[it]) }
@@ -155,6 +170,15 @@ internal constructor(
     }
 
     /**
+     * Replaces what sits beside the list — a "you are here" line that only becomes true once the
+     * proxy has answered, say.
+     */
+    fun setActions(actions: List<MenuEntry>) {
+        this.actions = actions
+        paged?.let(::drawActions)
+    }
+
+    /**
      * The same for a grouped menu. The open tab stays open when it still exists — a player who was
      * looking at "weapons" when the prices changed should still be looking at "weapons".
      */
@@ -168,16 +192,29 @@ internal constructor(
         }
     }
 
+    /**
+     * Actions live on the navigation row, which is the one row a page flip never redraws — so they
+     * stay put while the list moves under them. [PagedGui.navigation] owns its two ends; these fill
+     * inwards from the left of what is left.
+     */
+    private fun drawActions(gui: PagedGui<MenuEntry>) {
+        actions.forEachIndexed { index, action ->
+            val slot = gui.size - ROW_WIDTH + 1 + index
+            if (slot >= gui.size - 1) return@forEachIndexed
+            gui.setButton(slot, inventoryButton(action))
+        }
+    }
+
     private fun openForm() {
         BedrockForms.simple(
             player = player,
             title = title,
             content = Component.empty(),
-            buttons = entries.map(::formLabel),
+            buttons = (entries + actions).map(::formLabel),
         ) { index ->
             // A dismissed form answers null, and so does an index the client made up. Either way
             // nothing was chosen, which is exactly what closing a chest without clicking means.
-            index?.let { select(entries[it]) }
+            index?.let { select((entries + actions)[it]) }
         }
     }
 
@@ -340,10 +377,21 @@ class MenuGroupBuilder internal constructor(private val id: String) {
 class MenuBuilder internal constructor() {
     private val entries = mutableListOf<MenuEntry>()
     private val groups = mutableListOf<MenuGroup>()
+    private val actions = mutableListOf<MenuEntry>()
 
     /** Adds an entry. Order is the order they are declared in, on both surfaces. */
     fun entry(id: String, block: MenuEntryBuilder.() -> Unit = {}) {
         entries += MenuEntryBuilder(id).apply(block).build()
+    }
+
+    /**
+     * Adds something beside the list rather than in it — a way back, a way to another screen.
+     *
+     * On Java it sits on the navigation row and survives a page flip. On Bedrock, where there is no
+     * row to sit on, it follows the entries as an ordinary button.
+     */
+    fun action(id: String, block: MenuEntryBuilder.() -> Unit = {}) {
+        actions += MenuEntryBuilder(id).apply(block).build()
     }
 
     /** Adds a tab. A menu is either grouped or flat; mixing the two has no rendering. */
@@ -354,6 +402,8 @@ class MenuBuilder internal constructor() {
     internal fun build(): List<MenuEntry> = entries.toList()
 
     internal fun buildGroups(): List<MenuGroup> = groups.toList()
+
+    internal fun buildActions(): List<MenuEntry> = actions.toList()
 
     internal fun validate() {
         require(entries.isEmpty() || groups.isEmpty()) {
@@ -372,7 +422,7 @@ class MenuBuilder internal constructor() {
 fun menu(player: Player, title: Component, rows: Int = 6, block: MenuBuilder.() -> Unit): Menu {
     val builder = MenuBuilder().apply(block)
     builder.validate()
-    return Menu(player, title, builder.build(), builder.buildGroups(), rows)
+    return Menu(player, title, builder.build(), builder.buildGroups(), builder.buildActions(), rows)
 }
 
 /**
@@ -380,6 +430,10 @@ fun menu(player: Player, title: Component, rows: Int = 6, block: MenuBuilder.() 
  * have to be made a second time from fresher data.
  */
 fun menuEntries(block: MenuBuilder.() -> Unit): List<MenuEntry> = MenuBuilder().apply(block).build()
+
+/** The same for actions, feeding [Menu.setActions]. */
+fun menuActions(block: MenuBuilder.() -> Unit): List<MenuEntry> =
+    MenuBuilder().apply(block).buildActions()
 
 /** The same for groups, feeding [Menu.setGroups]. */
 fun menuGroups(block: MenuBuilder.() -> Unit): List<MenuGroup> =
