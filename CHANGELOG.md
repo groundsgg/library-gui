@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/groundsgg/library-gui/compare/v0.7.0...v0.7.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **bedrock:** send the form and register the listener together ([#30](https://github.com/groundsgg/library-gui/issues/30)) ([ad927eb](https://github.com/groundsgg/library-gui/commit/ad927eba7f9f290e49a9db06d7dbe29fab6981eb))
+
 ## [0.7.0](https://github.com/groundsgg/library-gui/compare/v0.6.0...v0.7.0) (2026-08-21)
 
 
