@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/groundsgg/library-gui/compare/v0.9.0...v0.10.0) (2026-08-22)
+
+
+### Features
+
+* **menu:** tabs, because two menus were already building them by hand ([#36](https://github.com/groundsgg/library-gui/issues/36)) ([868a2ff](https://github.com/groundsgg/library-gui/commit/868a2ff27023ba95ffbdcb7fb57c48346aa0c598))
+
 ## [0.9.0](https://github.com/groundsgg/library-gui/compare/v0.8.0...v0.9.0) (2026-08-22)
 
 
