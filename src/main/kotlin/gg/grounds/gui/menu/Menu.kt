@@ -1,6 +1,7 @@
 package gg.grounds.gui.menu
 
 import gg.grounds.gui.GuiButton
+import gg.grounds.gui.PagedGui
 import gg.grounds.gui.bedrock.BedrockForms
 import gg.grounds.gui.button
 import gg.grounds.gui.item
@@ -29,9 +30,14 @@ class Menu
 internal constructor(
     val player: Player,
     val title: Component,
-    val entries: List<MenuEntry>,
+    entries: List<MenuEntry>,
     private val rows: Int,
 ) {
+
+    var entries: List<MenuEntry> = entries
+        private set
+
+    private var paged: PagedGui<MenuEntry>? = null
 
     /**
      * Draws the menu on whichever surface fits the player, and hands control to it.
@@ -44,16 +50,31 @@ internal constructor(
     }
 
     private fun openInventory() {
-        pagedGui(
-                player = player,
-                title = { _, _ -> title },
-                items = entries,
-                rows = rows,
-                render = ::inventoryButton,
-            ) {
-                navigation()
-            }
-            .open()
+        paged =
+            pagedGui(
+                    player = player,
+                    title = { _, _ -> title },
+                    items = entries,
+                    rows = rows,
+                    render = ::inventoryButton,
+                ) {
+                    navigation()
+                }
+                .also { it.open() }
+    }
+
+    /**
+     * Replaces what the menu offers — for a list that arrives after the menu was opened, which is
+     * the normal case when the data comes from another service.
+     *
+     * A chest re-renders in place. A form does not: it is a snapshot the moment it reaches the
+     * device, and the server cannot alter it afterwards. Re-sending one to fake an update would
+     * yank the screen out from under the player's thumb, so a Bedrock player keeps what they were
+     * shown and sees the new list the next time they open the menu.
+     */
+    fun setEntries(entries: List<MenuEntry>) {
+        this.entries = entries
+        paged?.setItems(entries)
     }
 
     private fun openForm() {
@@ -86,7 +107,7 @@ internal constructor(
         fun itemFor(entry: MenuEntry): ItemStack =
             item(entry.icon) {
                 name(entry.label)
-                entry.description?.let { lore(it) }
+                if (entry.description.isNotEmpty()) lore(*entry.description.toTypedArray())
                 glowing = entry.state == EntryState.SELECTED
             }
 
@@ -95,8 +116,9 @@ internal constructor(
          * rides on a second line rather than being dropped — there is no lore to put it in.
          */
         fun formLabel(entry: MenuEntry): Component =
-            entry.description?.let { entry.label.append(Component.newline()).append(it) }
-                ?: entry.label
+            entry.description.fold(entry.label) { text, line ->
+                text.append(Component.newline()).append(line)
+            }
     }
 }
 
@@ -123,7 +145,8 @@ class MenuEntry
 internal constructor(
     val id: String,
     val label: Component,
-    val description: Component?,
+    /** Lore on Java, extra lines under the button text on Bedrock. Empty when there is none. */
+    val description: List<Component>,
     val icon: Material,
     val state: EntryState,
     internal val onSelect: () -> Unit,
@@ -131,10 +154,20 @@ internal constructor(
 
 class MenuEntryBuilder internal constructor(private val id: String) {
     var label: Component = Component.text(id)
-    var description: Component? = null
     var icon: Material = Material.PAPER
     var state: EntryState = EntryState.AVAILABLE
+    private var description: List<Component> = emptyList()
     private var onSelect: () -> Unit = {}
+
+    /** What the entry says under its label. Several lines, because menus here have several. */
+    fun description(vararg lines: Component) {
+        description = lines.toList()
+    }
+
+    /** The same, for a list that was built rather than spelled out. */
+    fun description(lines: List<Component>) {
+        description = lines.toList()
+    }
 
     /**
      * Runs when the player chooses this entry. Ignored while the entry is [EntryState.UNAVAILABLE].
@@ -164,4 +197,10 @@ class MenuBuilder internal constructor() {
  * list has no page to fit into.
  */
 fun menu(player: Player, title: Component, rows: Int = 6, block: MenuBuilder.() -> Unit): Menu =
-    Menu(player, title, MenuBuilder().apply(block).build(), rows)
+    Menu(player, title, menuEntries(block), rows)
+
+/**
+ * Builds entries without a menu around them — for [Menu.setEntries], where the same declarations
+ * have to be made a second time from fresher data.
+ */
+fun menuEntries(block: MenuBuilder.() -> Unit): List<MenuEntry> = MenuBuilder().apply(block).build()

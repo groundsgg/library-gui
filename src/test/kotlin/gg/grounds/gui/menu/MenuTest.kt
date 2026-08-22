@@ -3,7 +3,6 @@ package gg.grounds.gui.menu
 import gg.grounds.gui.bedrock.BedrockForms
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
@@ -42,7 +41,7 @@ class MenuTest {
         assertEquals("lobby-3", plain(entry.label))
         assertEquals(EntryState.AVAILABLE, entry.state)
         assertEquals(Material.PAPER, entry.icon)
-        assertNull(entry.description)
+        assertEquals(emptyList(), entry.description)
     }
 
     @Test
@@ -52,7 +51,7 @@ class MenuTest {
             entries {
                     entry("bedwars") {
                         label = Component.text("BedWars")
-                        description = Component.text("4 teams of 4")
+                        description(Component.text("4 teams of 4"), Component.text("12 queued"))
                         icon = Material.RED_BED
                     }
                 }
@@ -62,7 +61,10 @@ class MenuTest {
 
         assertEquals(Material.RED_BED, item.material())
         assertEquals("BedWars", plain(item.get(DataComponents.ITEM_NAME)!!))
-        assertEquals(listOf("4 teams of 4"), item.get(DataComponents.LORE)!!.map(::plain))
+        assertEquals(
+            listOf("4 teams of 4", "12 queued"),
+            item.get(DataComponents.LORE)!!.map(::plain),
+        )
     }
 
     @Test
@@ -85,12 +87,12 @@ class MenuTest {
             entries {
                     entry("duels") {
                         label = Component.text("Duels")
-                        description = Component.text("12 playing")
+                        description(Component.text("12 playing"), Component.text("Ranked open"))
                     }
                 }
                 .single()
 
-        assertEquals("Duels\n12 playing", plain(Menu.formLabel(entry)))
+        assertEquals("Duels\n12 playing\nRanked open", plain(Menu.formLabel(entry)))
     }
 
     @Test
@@ -98,6 +100,17 @@ class MenuTest {
         val entry = entries { entry("duels") { label = Component.text("Duels") } }.single()
 
         assertEquals("Duels", plain(Menu.formLabel(entry)))
+    }
+
+    @Test
+    fun `entries built on their own carry the same declarations`() {
+        val built = menuEntries {
+            entry("a") { label = Component.text("A") }
+            entry("b") { state = EntryState.SELECTED }
+        }
+
+        assertEquals(listOf("a", "b"), built.map { it.id })
+        assertEquals(EntryState.SELECTED, built[1].state)
     }
 
     @Test
