@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/groundsgg/library-gui/compare/v0.12.0...v0.13.0) (2026-08-22)
+
+
+### Features
+
+* **menu:** what sits beside the list, not in it ([#42](https://github.com/groundsgg/library-gui/issues/42)) ([91c7fc7](https://github.com/groundsgg/library-gui/commit/91c7fc772ffaaa714dab1e7486953fff6a7d663f))
+
 ## [0.12.0](https://github.com/groundsgg/library-gui/compare/v0.11.0...v0.12.0) (2026-08-22)
 
 
