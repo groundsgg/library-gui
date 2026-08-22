@@ -45,6 +45,7 @@ object BedrockForms {
     /** Floodgate's channel. Both directions travel on it. */
     const val CHANNEL: String = "floodgate:form"
 
+    private const val TYPE_SIMPLE: Byte = 0
     private const val TYPE_MODAL: Byte = 1
     private const val TYPE_CUSTOM: Byte = 2
 
@@ -93,6 +94,27 @@ object BedrockForms {
     }
 
     /**
+     * Shows an ordered list of buttons. [onResponse] receives the index of the button the player
+     * chose, or null when they dismissed the form — so it fires exactly once per form shown.
+     *
+     * Bedrock scrolls a form, so a long list needs no pagination. An index outside [buttons] is
+     * treated as a dismissal rather than trusted: the answer arrives from the client.
+     */
+    fun simple(
+        player: Player,
+        title: Component,
+        content: Component,
+        buttons: List<Component>,
+        onResponse: (Int?) -> Unit,
+    ) {
+        val json = simpleJson(plain(title), plain(content), buttons.map(::plain))
+        send(player, TYPE_SIMPLE, json) { response ->
+            val index = response?.trim()?.toIntOrNull()
+            onResponse(index?.takeIf { it in buttons.indices })
+        }
+    }
+
+    /**
      * Shows a yes/no dialog. [onResponse] receives true, false, or null when the player dismissed
      * it — so it fires exactly once for every form shown, which is the contract
      * [gg.grounds.gui.confirmGui] already promises on Java.
@@ -136,6 +158,26 @@ object BedrockForms {
         val json = customInputJson(plain(title), plain(label), placeholder, initial)
         send(player, TYPE_CUSTOM, json) { response -> onResponse(firstStringOfJsonArray(response)) }
     }
+
+    /**
+     * Cumulus's `form` shape — the simple form. Buttons carry no image: that needs either a URL the
+     * client can reach or a path into a Bedrock pack, and we ship neither.
+     */
+    internal fun simpleJson(title: String, content: String, buttons: List<String>): String =
+        buildString {
+            append("{\"type\":\"form\",\"title\":")
+            appendJsonString(title)
+            append(",\"content\":")
+            appendJsonString(content)
+            append(",\"buttons\":[")
+            buttons.forEachIndexed { index, text ->
+                if (index > 0) append(',')
+                append("{\"text\":")
+                appendJsonString(text)
+                append('}')
+            }
+            append("]}")
+        }
 
     /**
      * Cumulus's `modal` shape. Field names and the `type` value come from Cumulus's own codec and
