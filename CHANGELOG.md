@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/groundsgg/library-gui/compare/v0.11.0...v0.12.0) (2026-08-22)
+
+
+### Features
+
+* **menu:** an entry can carry a stack size ([#40](https://github.com/groundsgg/library-gui/issues/40)) ([9dc10b5](https://github.com/groundsgg/library-gui/commit/9dc10b5076872be6ea2fa0456a4e253c73daf73d))
+
 ## [0.11.0](https://github.com/groundsgg/library-gui/compare/v0.10.0...v0.11.0) (2026-08-22)
 
 
