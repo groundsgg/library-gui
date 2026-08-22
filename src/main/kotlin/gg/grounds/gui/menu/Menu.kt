@@ -121,7 +121,7 @@ internal constructor(
             player = player,
             title = title,
             content = Component.empty(),
-            buttons = groups.map { it.label },
+            buttons = groups.map(::groupLabel),
         ) { index ->
             // A tab row has no equivalent on a form, so a group becomes its own screen. Dismissing
             // the first one is the same "chose nothing" the chest answers when it is closed.
@@ -197,6 +197,7 @@ internal constructor(
         fun tabItem(group: MenuGroup, selected: Boolean): ItemStack =
             item(group.icon) {
                 name(group.label)
+                if (group.description.isNotEmpty()) lore(*group.description.toTypedArray())
                 glowing = selected
             }
 
@@ -210,6 +211,14 @@ internal constructor(
                 name(entry.label)
                 if (entry.description.isNotEmpty()) lore(*entry.description.toTypedArray())
                 glowing = entry.state == EntryState.SELECTED
+            }
+
+        /**
+         * The parent-screen button for a group: its name, then whatever the tab would have said.
+         */
+        fun groupLabel(group: MenuGroup): Component =
+            group.description.fold(group.label) { text, line ->
+                text.append(Component.newline()).append(line)
             }
 
         /**
@@ -291,6 +300,8 @@ class MenuGroup
 internal constructor(
     val id: String,
     val label: Component,
+    /** Lore on the tab, and the lines under the button on Bedrock. Empty when there is none. */
+    val description: List<Component>,
     val icon: Material,
     val entries: List<MenuEntry>,
 )
@@ -298,12 +309,23 @@ internal constructor(
 class MenuGroupBuilder internal constructor(private val id: String) {
     var label: Component = Component.text(id)
     var icon: Material = Material.PAPER
+    private var description: List<Component> = emptyList()
     private val entries = MenuBuilder()
+
+    /** What the tab says under its name — a total, a hint, whatever the group is worth saying. */
+    fun description(vararg lines: Component) {
+        description = lines.toList()
+    }
+
+    /** The same, for a list that was built rather than spelled out. */
+    fun description(lines: List<Component>) {
+        description = lines.toList()
+    }
 
     /** Adds an entry to this group. */
     fun entry(id: String, block: MenuEntryBuilder.() -> Unit = {}) = entries.entry(id, block)
 
-    internal fun build(): MenuGroup = MenuGroup(id, label, icon, entries.build())
+    internal fun build(): MenuGroup = MenuGroup(id, label, description, icon, entries.build())
 }
 
 class MenuBuilder internal constructor() {

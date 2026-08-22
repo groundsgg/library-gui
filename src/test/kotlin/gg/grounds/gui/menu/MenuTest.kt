@@ -176,6 +176,32 @@ class MenuTest {
     }
 
     @Test
+    fun `a tab carries its description as lore`() {
+        MinecraftServer.init()
+        val group =
+            menuGroups {
+                    group("ranked") {
+                        label = Component.text("Ranked")
+                        description(Component.text("Rated"), Component.text("7 queued"))
+                        icon = Material.DIAMOND
+                    }
+                }
+                .single()
+
+        val lore = Menu.tabItem(group, selected = false).get(DataComponents.LORE)!!.map(::plain)
+
+        assertEquals(listOf("Rated", "7 queued"), lore)
+        assertEquals("Ranked\nRated\n7 queued", plain(Menu.groupLabel(group)))
+    }
+
+    @Test
+    fun `a group without a description is its label alone on bedrock`() {
+        val group = menuGroups { group("casual") { label = Component.text("Casual") } }.single()
+
+        assertEquals("Casual", plain(Menu.groupLabel(group)))
+    }
+
+    @Test
     fun `a menu cannot be grouped and flat at once`() {
         val builder =
             MenuBuilder().apply {
