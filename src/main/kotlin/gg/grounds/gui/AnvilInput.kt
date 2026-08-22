@@ -53,8 +53,7 @@ class AnvilInput(
      *
      * That is the one place where Bedrock is served better than Java: the anvil path relies on the
      * client sending its rename field on roughly every keystroke, and only once slot 0 holds an
-     * item. A form input has neither constraint. See [BedrockForms] — and call
-     * [BedrockForms.install] once at startup, or the prompt never answers.
+     * item. A form input has neither constraint. See [BedrockForms].
      */
     override fun open() {
         if (!BedrockForms.isBedrock(player)) {

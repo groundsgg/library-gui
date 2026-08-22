@@ -36,9 +36,9 @@ import net.minestom.server.event.player.PlayerPluginMessageEvent
  *           byte 2..N  response data, UTF-8
  * ```
  *
- * Call [install] once at startup. Without it, forms are still sent but no response ever arrives, so
- * every callback would be stranded — [install] is what makes a form a question rather than a
- * broadcast.
+ * Sending a form registers the response listener on first use, so nothing has to be wired up at
+ * startup. [install] is public for callers that would rather pay that cost before the first
+ * player arrives; calling it is optional and harmless.
  */
 object BedrockForms {
 
@@ -74,7 +74,8 @@ object BedrockForms {
     @Volatile private var installed = false
 
     /**
-     * Registers the response listener. Idempotent, so calling it from several modules is harmless.
+     * Registers the response listener. Idempotent, so calling it from several modules is harmless,
+     * and [send] calls it before the first form goes out — a caller that forgets it loses nothing.
      */
     @Synchronized
     fun install() {
@@ -177,6 +178,11 @@ object BedrockForms {
     }
 
     private fun send(player: Player, type: Byte, json: String, onResponse: (String?) -> Unit) {
+        // A form without the listener is a broadcast, not a question: it reaches the device and the
+        // answer is dropped, so the callback never runs and the caller waits forever. That failure
+        // is silent, which is the worst kind to leave to a startup call every consumer must
+        // remember, so the send registers it.
+        install()
         val state = states.computeIfAbsent(player.uuid) { State() }
         val id: Short
         synchronized(state) {
