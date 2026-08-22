@@ -15,7 +15,7 @@ import net.minestom.server.item.Material
  *
  * A Bedrock player gets a native modal form instead of the chest — same contract, including the
  * "cancel also means dismissed" rule. See [BedrockForms] for why translating the chest is not an
- * option, and call [BedrockForms.install] once at startup or the dialog never answers.
+ * option. Nothing has to be wired up at startup.
  */
 fun confirmGui(
     player: Player,
