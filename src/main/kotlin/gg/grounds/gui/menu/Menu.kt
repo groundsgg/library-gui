@@ -208,6 +208,7 @@ internal constructor(
          */
         fun itemFor(entry: MenuEntry): ItemStack =
             item(entry.icon) {
+                amount = entry.amount
                 name(entry.label)
                 if (entry.description.isNotEmpty()) lore(*entry.description.toTypedArray())
                 glowing = entry.state == EntryState.SELECTED
@@ -258,6 +259,10 @@ internal constructor(
     /** Lore on Java, extra lines under the button text on Bedrock. Empty when there is none. */
     val description: List<Component>,
     val icon: Material,
+    /**
+     * Stack size on the icon — a shop sells eight wool, not wool. Java only; a form has no item.
+     */
+    val amount: Int,
     val state: EntryState,
     internal val onSelect: () -> Unit,
 )
@@ -265,6 +270,9 @@ internal constructor(
 class MenuEntryBuilder internal constructor(private val id: String) {
     var label: Component = Component.text(id)
     var icon: Material = Material.PAPER
+
+    /** Stack size on the icon. Ignored on Bedrock, where the button is text. */
+    var amount: Int = 1
     var state: EntryState = EntryState.AVAILABLE
     private var description: List<Component> = emptyList()
     private var onSelect: () -> Unit = {}
@@ -286,7 +294,8 @@ class MenuEntryBuilder internal constructor(private val id: String) {
         onSelect = handler
     }
 
-    internal fun build(): MenuEntry = MenuEntry(id, label, description, icon, state, onSelect)
+    internal fun build(): MenuEntry =
+        MenuEntry(id, label, description, icon, amount, state, onSelect)
 }
 
 /**

@@ -70,6 +70,21 @@ class MenuTest {
     }
 
     @Test
+    fun `an entry can carry a stack size`() {
+        MinecraftServer.init()
+        val entry =
+            entries {
+                    entry("wool") {
+                        icon = Material.WHITE_WOOL
+                        amount = 8
+                    }
+                }
+                .single()
+
+        assertEquals(8, Menu.itemFor(entry).amount())
+    }
+
+    @Test
     fun `only a selected entry glows`() {
         MinecraftServer.init()
         val built = entries {
