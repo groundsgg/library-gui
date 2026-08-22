@@ -31,13 +31,19 @@ internal constructor(
     val player: Player,
     val title: Component,
     entries: List<MenuEntry>,
+    groups: List<MenuGroup>,
     private val rows: Int,
 ) {
 
     var entries: List<MenuEntry> = entries
         private set
 
+    /** The tabs, when the menu has any. Empty for a flat menu. */
+    var groups: List<MenuGroup> = groups
+        private set
+
     private var paged: PagedGui<MenuEntry>? = null
+    private var selectedGroup: Int = 0
 
     /**
      * Draws the menu on whichever surface fits the player, and hands control to it.
@@ -46,7 +52,13 @@ internal constructor(
      * instead of drawing it.
      */
     fun open() {
-        if (BedrockForms.isBedrock(player)) openForm() else openInventory()
+        val bedrock = BedrockForms.isBedrock(player)
+        when {
+            groups.isEmpty() && bedrock -> openForm()
+            groups.isEmpty() -> openInventory()
+            bedrock -> openGroupForm()
+            else -> openGroupedInventory()
+        }
     }
 
     private fun openInventory() {
@@ -64,6 +76,71 @@ internal constructor(
     }
 
     /**
+     * The tab row is the top row, centred — a menu with three tabs should not sit hard against the
+     * left edge — and the content sits under it. The selected tab glows, because once the row is
+     * centred its position tells the player nothing about which one is open.
+     */
+    private fun openGroupedInventory() {
+        require(rows >= 3) { "a grouped menu needs at least 3 rows (tabs + content + navigation)" }
+        val contentSlots = (ROW_WIDTH until (rows - 1) * ROW_WIDTH).toList()
+        paged =
+            pagedGui(
+                    player = player,
+                    title = { _, _ -> title },
+                    items = groups[selectedGroup].entries,
+                    rows = rows,
+                    contentSlots = contentSlots,
+                    render = ::inventoryButton,
+                ) {
+                    navigation()
+                }
+                .also {
+                    drawTabs(it)
+                    it.open()
+                }
+    }
+
+    private fun drawTabs(gui: PagedGui<MenuEntry>) {
+        val offset = (ROW_WIDTH - groups.size).coerceAtLeast(0) / 2
+        groups.forEachIndexed { index, group ->
+            val slot = offset + index
+            if (slot >= ROW_WIDTH) return@forEachIndexed
+            gui.button(slot, tabItem(group, selected = index == selectedGroup)) {
+                onClick {
+                    if (index == selectedGroup) return@onClick
+                    selectedGroup = index
+                    gui.setItems(group.entries)
+                    drawTabs(gui)
+                }
+            }
+        }
+    }
+
+    private fun openGroupForm() {
+        BedrockForms.simple(
+            player = player,
+            title = title,
+            content = Component.empty(),
+            buttons = groups.map { it.label },
+        ) { index ->
+            // A tab row has no equivalent on a form, so a group becomes its own screen. Dismissing
+            // the first one is the same "chose nothing" the chest answers when it is closed.
+            index?.let { openEntryForm(groups[it]) }
+        }
+    }
+
+    private fun openEntryForm(group: MenuGroup) {
+        BedrockForms.simple(
+            player = player,
+            title = group.label,
+            content = Component.empty(),
+            buttons = group.entries.map(::formLabel),
+        ) { index ->
+            index?.let { select(group.entries[it]) }
+        }
+    }
+
+    /**
      * Replaces what the menu offers — for a list that arrives after the menu was opened, which is
      * the normal case when the data comes from another service.
      *
@@ -75,6 +152,20 @@ internal constructor(
     fun setEntries(entries: List<MenuEntry>) {
         this.entries = entries
         paged?.setItems(entries)
+    }
+
+    /**
+     * The same for a grouped menu. The open tab stays open when it still exists — a player who was
+     * looking at "weapons" when the prices changed should still be looking at "weapons".
+     */
+    fun setGroups(groups: List<MenuGroup>) {
+        require(groups.isNotEmpty()) { "a grouped menu needs at least one group" }
+        this.groups = groups
+        selectedGroup = selectedGroup.coerceIn(0, groups.size - 1)
+        paged?.let {
+            it.setItems(groups[selectedGroup].entries)
+            drawTabs(it)
+        }
     }
 
     private fun openForm() {
@@ -99,6 +190,16 @@ internal constructor(
         button(itemFor(entry)) { onClick { select(entry) } }
 
     internal companion object {
+        /** A chest row, which is what makes the top row a tab row. */
+        private const val ROW_WIDTH = 9
+
+        /** A tab: the group's own label and icon, glowing while it is the open one. */
+        fun tabItem(group: MenuGroup, selected: Boolean): ItemStack =
+            item(group.icon) {
+                name(group.label)
+                glowing = selected
+            }
+
         /**
          * The item a Java player sees. The label is the name and the description is the lore, so an
          * entry reads the same on both surfaces; a selected entry glows, which is the one piece of
@@ -179,15 +280,56 @@ class MenuEntryBuilder internal constructor(private val id: String) {
     internal fun build(): MenuEntry = MenuEntry(id, label, description, icon, state, onSelect)
 }
 
+/**
+ * A named set of entries — the tab row `ShopScreen` and `DuelMenu` each build by hand today.
+ *
+ * On Bedrock a tab row has no equivalent, so a group becomes its own form screen reached from a
+ * parent one. That is why a group carries a label and an icon of its own rather than being a bare
+ * partition of the list.
+ */
+class MenuGroup
+internal constructor(
+    val id: String,
+    val label: Component,
+    val icon: Material,
+    val entries: List<MenuEntry>,
+)
+
+class MenuGroupBuilder internal constructor(private val id: String) {
+    var label: Component = Component.text(id)
+    var icon: Material = Material.PAPER
+    private val entries = MenuBuilder()
+
+    /** Adds an entry to this group. */
+    fun entry(id: String, block: MenuEntryBuilder.() -> Unit = {}) = entries.entry(id, block)
+
+    internal fun build(): MenuGroup = MenuGroup(id, label, icon, entries.build())
+}
+
 class MenuBuilder internal constructor() {
     private val entries = mutableListOf<MenuEntry>()
+    private val groups = mutableListOf<MenuGroup>()
 
     /** Adds an entry. Order is the order they are declared in, on both surfaces. */
     fun entry(id: String, block: MenuEntryBuilder.() -> Unit = {}) {
         entries += MenuEntryBuilder(id).apply(block).build()
     }
 
+    /** Adds a tab. A menu is either grouped or flat; mixing the two has no rendering. */
+    fun group(id: String, block: MenuGroupBuilder.() -> Unit = {}) {
+        groups += MenuGroupBuilder(id).apply(block).build()
+    }
+
     internal fun build(): List<MenuEntry> = entries.toList()
+
+    internal fun buildGroups(): List<MenuGroup> = groups.toList()
+
+    internal fun validate() {
+        require(entries.isEmpty() || groups.isEmpty()) {
+            "a menu is either grouped or flat: entries outside a group have nowhere to go once the " +
+                "top row is tabs"
+        }
+    }
 }
 
 /**
@@ -196,11 +338,18 @@ class MenuBuilder internal constructor() {
  * [rows] sizes the chest for Java players and is ignored on Bedrock, where a form scrolls and the
  * list has no page to fit into.
  */
-fun menu(player: Player, title: Component, rows: Int = 6, block: MenuBuilder.() -> Unit): Menu =
-    Menu(player, title, menuEntries(block), rows)
+fun menu(player: Player, title: Component, rows: Int = 6, block: MenuBuilder.() -> Unit): Menu {
+    val builder = MenuBuilder().apply(block)
+    builder.validate()
+    return Menu(player, title, builder.build(), builder.buildGroups(), rows)
+}
 
 /**
  * Builds entries without a menu around them — for [Menu.setEntries], where the same declarations
  * have to be made a second time from fresher data.
  */
 fun menuEntries(block: MenuBuilder.() -> Unit): List<MenuEntry> = MenuBuilder().apply(block).build()
+
+/** The same for groups, feeding [Menu.setGroups]. */
+fun menuGroups(block: MenuBuilder.() -> Unit): List<MenuGroup> =
+    MenuBuilder().apply(block).buildGroups()

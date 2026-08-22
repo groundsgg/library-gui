@@ -3,6 +3,8 @@ package gg.grounds.gui.menu
 import gg.grounds.gui.bedrock.BedrockForms
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
@@ -134,5 +136,53 @@ class MenuTest {
         val json = BedrockForms.simpleJson("t", "", listOf("He said \"hi\""))
 
         assertTrue(json.contains("""{"text":"He said \"hi\""}"""), json)
+    }
+
+    @Test
+    fun `groups keep their order and their entries`() {
+        val groups = menuGroups {
+            group("blocks") {
+                label = Component.text("Blocks")
+                entry("wool")
+                entry("clay")
+            }
+            group("weapons") { label = Component.text("Weapons") }
+        }
+
+        assertEquals(listOf("blocks", "weapons"), groups.map { it.id })
+        assertEquals(listOf("wool", "clay"), groups.first().entries.map { it.id })
+        assertTrue(groups.last().entries.isEmpty())
+    }
+
+    @Test
+    fun `only the open tab glows`() {
+        MinecraftServer.init()
+        val group =
+            menuGroups {
+                    group("blocks") {
+                        label = Component.text("Blocks")
+                        icon = Material.WHITE_WOOL
+                    }
+                }
+                .single()
+
+        val open = Menu.tabItem(group, selected = true)
+        val closed = Menu.tabItem(group, selected = false)
+
+        assertEquals(Material.WHITE_WOOL, open.material())
+        assertEquals("Blocks", plain(open.get(DataComponents.ITEM_NAME)!!))
+        assertEquals(true, open.get(DataComponents.ENCHANTMENT_GLINT_OVERRIDE))
+        assertNull(closed.get(DataComponents.ENCHANTMENT_GLINT_OVERRIDE))
+    }
+
+    @Test
+    fun `a menu cannot be grouped and flat at once`() {
+        val builder =
+            MenuBuilder().apply {
+                entry("loose")
+                group("blocks")
+            }
+
+        assertFailsWith<IllegalArgumentException> { builder.validate() }
     }
 }
