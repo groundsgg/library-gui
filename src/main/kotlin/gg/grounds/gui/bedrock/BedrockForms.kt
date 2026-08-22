@@ -37,8 +37,8 @@ import net.minestom.server.event.player.PlayerPluginMessageEvent
  * ```
  *
  * Sending a form registers the response listener on first use, so nothing has to be wired up at
- * startup. [install] is public for callers that would rather pay that cost before the first
- * player arrives; calling it is optional and harmless.
+ * startup. [install] is public for callers that would rather pay that cost before the first player
+ * arrives; calling it is optional and harmless.
  */
 object BedrockForms {
 
