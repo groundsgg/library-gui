@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/groundsgg/library-gui/compare/v0.7.1...v0.8.0) (2026-08-22)
+
+
+### Features
+
+* **menu:** describe a menu by what it offers, not where it draws ([#32](https://github.com/groundsgg/library-gui/issues/32)) ([79da2f4](https://github.com/groundsgg/library-gui/commit/79da2f4d470bde665b604470a38b4ba9670d3870))
+
 ## [0.7.1](https://github.com/groundsgg/library-gui/compare/v0.7.0...v0.7.1) (2026-08-22)
 
 
