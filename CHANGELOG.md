@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/groundsgg/library-gui/compare/v0.13.0...v0.13.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **menu:** a Bedrock tap runs the button the player pressed ([#44](https://github.com/groundsgg/library-gui/issues/44)) ([604128f](https://github.com/groundsgg/library-gui/commit/604128f25d8e220dd0348d16359b9a2e1478b150))
+
 ## [0.13.0](https://github.com/groundsgg/library-gui/compare/v0.12.0...v0.13.0) (2026-08-22)
 
 
