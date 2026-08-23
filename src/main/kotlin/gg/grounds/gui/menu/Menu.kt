@@ -34,6 +34,9 @@ internal constructor(
     groups: List<MenuGroup>,
     actions: List<MenuEntry>,
     private val rows: Int,
+    private val backLabel: Component?,
+    private val staysOpen: Boolean,
+    private val onGroupSelect: (String) -> Unit,
 ) {
 
     var entries: List<MenuEntry> = entries
@@ -123,35 +126,57 @@ internal constructor(
                     selectedGroup = index
                     gui.setItems(group.entries)
                     drawTabs(gui)
+                    // After the redraw: a consumer that rebuilds its groups here (prices that moved
+                    // while the shop was open, say) calls setGroups, which redraws again.
+                    onGroupSelect(group.id)
                 }
             }
         }
     }
 
     private fun openGroupForm() {
+        val shownGroups = groups
+        val shownActions = actions
         BedrockForms.simple(
             player = player,
             title = title,
             content = Component.empty(),
-            buttons = groups.map(::groupLabel) + actions.map(::formLabel),
+            buttons = shownGroups.map(::groupLabel) + shownActions.map(::formLabel),
         ) { index ->
-            if (index != null && index >= groups.size) {
-                return@simple select(actions[index - groups.size])
+            val chosen = index ?: return@simple
+            if (chosen >= shownGroups.size) {
+                val action = shownActions[chosen - shownGroups.size]
+                if (!select(action)) openGroupForm()
+                return@simple
             }
             // A tab row has no equivalent on a form, so a group becomes its own screen. Dismissing
             // the first one is the same "chose nothing" the chest answers when it is closed.
-            index?.let { openEntryForm(groups[it]) }
+            val group = shownGroups[chosen]
+            onGroupSelect(group.id)
+            openEntryForm(group)
         }
     }
 
+    /**
+     * One group as its own screen.
+     *
+     * A form is a screen, not a window: the tap that chooses is also the tap that closes it. So a
+     * group needs a way back the tab row never did, and a menu whose entries are meant to be used
+     * more than once — a shop — has to be sent again after each one.
+     */
     private fun openEntryForm(group: MenuGroup) {
+        val shown = group.entries
+        val back = backLabel
+        val buttons = shown.map(::formLabel) + listOfNotNull(back)
         BedrockForms.simple(
             player = player,
             title = group.label,
             content = Component.empty(),
-            buttons = group.entries.map(::formLabel),
+            buttons = buttons,
         ) { index ->
-            index?.let { select(group.entries[it]) }
+            val chosen = index ?: return@simple
+            if (back != null && chosen == shown.size) return@simple openGroupForm()
+            if (!select(shown[chosen]) || staysOpen) openEntryForm(group)
         }
     }
 
@@ -206,21 +231,36 @@ internal constructor(
     }
 
     private fun openForm() {
+        // Bound once, on purpose. The properties are replaced by setEntries/setActions, and the
+        // consumers do exactly that a tick after opening — so reading them again when the answer
+        // arrives would resolve the tap against a list the player never saw. The rendering is
+        // already frozen on the device; the resolution has to be frozen with it.
+        val shown = entries + actions
         BedrockForms.simple(
             player = player,
             title = title,
             content = Component.empty(),
-            buttons = (entries + actions).map(::formLabel),
+            buttons = shown.map(::formLabel),
         ) { index ->
             // A dismissed form answers null, and so does an index the client made up. Either way
             // nothing was chosen, which is exactly what closing a chest without clicking means.
-            index?.let { select((entries + actions)[it]) }
+            val chosen = index?.let { shown[it] } ?: return@simple
+            if (!select(chosen) || staysOpen) openForm()
         }
     }
 
-    private fun select(entry: MenuEntry) {
-        if (entry.state == EntryState.UNAVAILABLE) return
+    /**
+     * Runs the entry, and says whether anything happened.
+     *
+     * The answer matters only on Bedrock. A chest survives a click that does nothing — the window
+     * is still there and the player tries another slot. A form is *consumed* by the tap: "did
+     * nothing" and "the menu is gone" are the same event, with no sound and no message, which reads
+     * as a crash. So the form path re-sends itself when this returns false.
+     */
+    private fun select(entry: MenuEntry): Boolean {
+        if (entry.state == EntryState.UNAVAILABLE || !entry.hasAction) return false
         entry.onSelect()
+        return true
     }
 
     internal fun inventoryButton(entry: MenuEntry): GuiButton =
@@ -233,7 +273,7 @@ internal constructor(
         /** A tab: the group's own label and icon, glowing while it is the open one. */
         fun tabItem(group: MenuGroup, selected: Boolean): ItemStack =
             item(group.icon) {
-                name(group.label)
+                name(if (selected) group.selectedLabel ?: group.label else group.label)
                 if (group.description.isNotEmpty()) lore(*group.description.toTypedArray())
                 glowing = selected
             }
@@ -302,6 +342,11 @@ internal constructor(
     val amount: Int,
     val state: EntryState,
     internal val onSelect: () -> Unit,
+    /**
+     * Whether [onSelect] was declared at all. A chest can afford to treat "no handler" as "click
+     * does nothing"; a form cannot, because the tap consumes the screen either way.
+     */
+    internal val hasAction: Boolean,
 )
 
 class MenuEntryBuilder internal constructor(private val id: String) {
@@ -313,6 +358,7 @@ class MenuEntryBuilder internal constructor(private val id: String) {
     var state: EntryState = EntryState.AVAILABLE
     private var description: List<Component> = emptyList()
     private var onSelect: () -> Unit = {}
+    private var hasAction = false
 
     /** What the entry says under its label. Several lines, because menus here have several. */
     fun description(vararg lines: Component) {
@@ -329,10 +375,11 @@ class MenuEntryBuilder internal constructor(private val id: String) {
      */
     fun onSelect(handler: () -> Unit) {
         onSelect = handler
+        hasAction = true
     }
 
     internal fun build(): MenuEntry =
-        MenuEntry(id, label, description, icon, amount, state, onSelect)
+        MenuEntry(id, label, description, icon, amount, state, onSelect, hasAction)
 }
 
 /**
@@ -346,6 +393,8 @@ class MenuGroup
 internal constructor(
     val id: String,
     val label: Component,
+    /** What the tab reads while it is the open one. Falls back to [label]; Java only. */
+    val selectedLabel: Component?,
     /** Lore on the tab, and the lines under the button on Bedrock. Empty when there is none. */
     val description: List<Component>,
     val icon: Material,
@@ -354,6 +403,12 @@ internal constructor(
 
 class MenuGroupBuilder internal constructor(private val id: String) {
     var label: Component = Component.text(id)
+
+    /**
+     * What the tab reads while it is open, when that is more than a highlight — a menu that had a
+     * separate wording for the open side before it had a glint.
+     */
+    var selectedLabel: Component? = null
     var icon: Material = Material.PAPER
     private var description: List<Component> = emptyList()
     private val entries = MenuBuilder()
@@ -371,13 +426,39 @@ class MenuGroupBuilder internal constructor(private val id: String) {
     /** Adds an entry to this group. */
     fun entry(id: String, block: MenuEntryBuilder.() -> Unit = {}) = entries.entry(id, block)
 
-    internal fun build(): MenuGroup = MenuGroup(id, label, description, icon, entries.build())
+    internal fun build(): MenuGroup =
+        MenuGroup(id, label, selectedLabel, description, icon, entries.build())
 }
 
 class MenuBuilder internal constructor() {
     private val entries = mutableListOf<MenuEntry>()
     private val groups = mutableListOf<MenuGroup>()
     private val actions = mutableListOf<MenuEntry>()
+    private var onGroupSelect: (String) -> Unit = {}
+
+    /**
+     * The way back out of a group, on Bedrock only.
+     *
+     * A chest keeps its tab row while the player looks at a shelf; a form replaces the screen, so
+     * without this a mistapped category is a one-way door. Needs a caller-supplied Component
+     * because the library has no translations of its own. Null leaves the screen without one.
+     */
+    var backLabel: Component? = null
+
+    /**
+     * Whether choosing something keeps the menu open, on Bedrock only.
+     *
+     * A shop is used several times per visit; a queue button is used once. On Java the chest stays
+     * open either way, which is why this has no effect there.
+     */
+    var staysOpen: Boolean = false
+
+    /** Runs when the player opens a different group — a chance to rebuild it from fresher data. */
+    fun onGroupSelect(handler: (String) -> Unit) {
+        onGroupSelect = handler
+    }
+
+    internal fun groupSelectHandler(): (String) -> Unit = onGroupSelect
 
     /** Adds an entry. Order is the order they are declared in, on both surfaces. */
     fun entry(id: String, block: MenuEntryBuilder.() -> Unit = {}) {
@@ -422,7 +503,17 @@ class MenuBuilder internal constructor() {
 fun menu(player: Player, title: Component, rows: Int = 6, block: MenuBuilder.() -> Unit): Menu {
     val builder = MenuBuilder().apply(block)
     builder.validate()
-    return Menu(player, title, builder.build(), builder.buildGroups(), builder.buildActions(), rows)
+    return Menu(
+        player,
+        title,
+        builder.build(),
+        builder.buildGroups(),
+        builder.buildActions(),
+        rows,
+        builder.backLabel,
+        builder.staysOpen,
+        builder.groupSelectHandler(),
+    )
 }
 
 /**
