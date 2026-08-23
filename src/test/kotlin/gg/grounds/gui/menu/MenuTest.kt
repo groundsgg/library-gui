@@ -257,4 +257,48 @@ class MenuTest {
 
         assertFailsWith<IllegalArgumentException> { builder.validate() }
     }
+
+    @Test
+    fun `an entry without an onSelect is not an action`() {
+        val built = entries {
+            entry("here")
+            entry("lobby-1") { onSelect {} }
+        }
+
+        assertEquals(listOf(false, true), built.map { it.hasAction })
+    }
+
+    @Test
+    fun `a group can read differently while it is open`() {
+        MinecraftServer.init()
+        val group =
+            menuGroups {
+                    group("ranked") {
+                        label = Component.text("Ranked")
+                        selectedLabel = Component.text("> Ranked <")
+                        icon = Material.DIAMOND
+                    }
+                }
+                .single()
+
+        assertEquals(
+            "> Ranked <",
+            plain(Menu.tabItem(group, selected = true).get(DataComponents.ITEM_NAME)!!),
+        )
+        assertEquals(
+            "Ranked",
+            plain(Menu.tabItem(group, selected = false).get(DataComponents.ITEM_NAME)!!),
+        )
+    }
+
+    @Test
+    fun `a group without a selected label keeps its own while open`() {
+        MinecraftServer.init()
+        val group = menuGroups { group("casual") { label = Component.text("Casual") } }.single()
+
+        assertEquals(
+            "Casual",
+            plain(Menu.tabItem(group, selected = true).get(DataComponents.ITEM_NAME)!!),
+        )
+    }
 }
