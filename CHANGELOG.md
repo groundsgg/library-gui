@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/groundsgg/library-gui/compare/v0.13.1...v1.0.0) (2026-10-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* themes with frames must declare PackFormat(97); the shader no longer works on 26.2 clients.
+
+### Features
+
+* port the text shader to minecraft 26.3 ([#46](https://github.com/groundsgg/library-gui/issues/46)) ([7ed6679](https://github.com/groundsgg/library-gui/commit/7ed6679260e2837fb8697fae79dbc6cca939b9da))
+
 ## [0.13.1](https://github.com/groundsgg/library-gui/compare/v0.13.0...v0.13.1) (2026-08-23)
 
 
