@@ -168,11 +168,11 @@ private constructor(val entries: List<PlannedThemeEntry>, val provides: Set<Rend
         private fun requireShaderFormat(theme: Theme) {
             if (theme.frames.isNotEmpty()) {
                 require(
-                    theme.packFormat.format == 88 &&
-                        theme.packFormat.minInclusive == 88 &&
-                        theme.packFormat.maxInclusive == 88
+                    theme.packFormat.format == 97 &&
+                        theme.packFormat.minInclusive == 97 &&
+                        theme.packFormat.maxInclusive == 97
                 ) {
-                    "Theme '${theme.namespace}' uses the Minecraft 26.2 text shader and must declare pack format range 88..88, but declares ${theme.packFormat.minInclusive}..${theme.packFormat.maxInclusive}."
+                    "Theme '${theme.namespace}' uses the Minecraft 26.3 text shader and must declare pack format range 97..97, but declares ${theme.packFormat.minInclusive}..${theme.packFormat.maxInclusive}."
                 }
             }
         }
