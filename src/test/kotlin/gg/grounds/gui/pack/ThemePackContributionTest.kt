@@ -35,7 +35,7 @@ class ThemePackContributionTest {
         val assets = createTempDirectory("assets")
         png(assets, "frame/outline.png", 4, 1)
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 frame("outline", "frame/outline.png")
                 colour("blue", 0x123456)
             }
@@ -107,7 +107,7 @@ class ThemePackContributionTest {
         source.writeBytes(
             byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00)
         )
-        val subject = theme("grounds", GuiPackFormat(88)) { panel("shop", texture, 176, 166) }
+        val subject = theme("grounds", GuiPackFormat(97)) { panel("shop", texture, 176, 166) }
 
         val failure =
             assertFailsWith<IllegalArgumentException> { subject.toPackContribution(assets) }
@@ -127,7 +127,7 @@ class ThemePackContributionTest {
         val frame = png(assets, "tooltips/gold_frame.png", 24, 24)
         val sourceTree = tree(assets)
         val contribution =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                     panel("shop", "panels/shop.png", 176, 166)
                     icon("coin", "icons/coin.png")
                     emptyIcon("blank")
@@ -224,15 +224,15 @@ class ThemePackContributionTest {
         val assets = createTempDirectory("assets")
         val missingRoot = createTempDirectory("missing") / "absent"
         val missing =
-            theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/missing.png", 176, 166) }
+            theme("grounds", GuiPackFormat(97)) { panel("shop", "panels/missing.png", 176, 166) }
         val wrongSize =
-            theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/wrong.png", 176, 166) }
+            theme("grounds", GuiPackFormat(97)) { panel("shop", "panels/wrong.png", 176, 166) }
         png(assets, "panels/wrong.png", 175, 166)
         val transparent =
-            theme("grounds", GuiPackFormat(88)) { panel("shop", "panels/soft.png", 176, 166) }
+            theme("grounds", GuiPackFormat(97)) { panel("shop", "panels/soft.png", 176, 166) }
         png(assets, "panels/soft.png", 176, 166, opaqueWidth = 100)
         val oversized =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 tooltip("gold", "tooltips/a.png", "tooltips/b.png", border = 4)
             }
         png(assets, "tooltips/a.png", 6, 6)
@@ -284,19 +284,19 @@ class ThemePackContributionTest {
 
     @Test
     fun `converts the GUI pack format exactly`() {
-        val actual = GuiPackFormat(88, minInclusive = 84, maxInclusive = 88).toResourcePackFormat()
+        val actual = GuiPackFormat(97, minInclusive = 93, maxInclusive = 97).toResourcePackFormat()
 
-        assertEquals(88, actual.format)
-        assertEquals(ResourcePackFormatRange(84, 88), actual.range)
+        assertEquals(97, actual.format)
+        assertEquals(ResourcePackFormatRange(93, 97), actual.range)
     }
 
     @Test
     fun `converts an empty theme into a contribution with its font`() {
         val contribution =
-            theme("example", GuiPackFormat(88)).toPackContribution(createTempDirectory("assets"))
+            theme("example", GuiPackFormat(97)).toPackContribution(createTempDirectory("assets"))
 
         assertEquals(ContributionId.of("example:gui"), contribution.id)
-        assertEquals(ResourcePackFormatRange(88, 88), contribution.supportedFormats)
+        assertEquals(ResourcePackFormatRange(97, 97), contribution.supportedFormats)
         assertEquals(
             listOf("assets/example/font/gui.json"),
             contribution.entries.map { it.path.value },
@@ -312,7 +312,7 @@ class ThemePackContributionTest {
         val back = png(assets, "highlight/back.png", 8, 8)
         val front = png(assets, "highlight/front.png", 8, 8)
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 slotHighlight("highlight/back.png", "highlight/front.png")
                 bundleFiller()
             }
@@ -420,7 +420,7 @@ class ThemePackContributionTest {
         val assets = createTempDirectory("assets")
         png(assets, "frame/Outline!.png", 4, 2, pixels = mapOf(1 to 0xFF102030.toInt()))
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 frame("outline", "frame/Outline!.png")
                 glyphs("digits", "digit_", mapOf(48 to 6))
                 slice("button", "outline", "outline", "outline", capWidth = 2, middleWidth = 4)
@@ -483,7 +483,7 @@ class ThemePackContributionTest {
         png(assets, "highlight/back.png", 8, 8)
         png(assets, "highlight/front.png", 8, 8)
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 frame("outline", "frame/outline.png")
                 slotHighlight("highlight/back.png", "highlight/front.png")
                 bundleFiller()
@@ -499,7 +499,7 @@ class ThemePackContributionTest {
     @Test
     fun `a frame-free contribution does not provide the text marker shader capability`() {
         val contribution =
-            theme("grounds", GuiPackFormat(88)).toPackContribution(createTempDirectory("assets"))
+            theme("grounds", GuiPackFormat(97)).toPackContribution(createTempDirectory("assets"))
 
         assertEquals(emptySet(), contribution.provides)
     }
@@ -513,7 +513,7 @@ class ThemePackContributionTest {
         png(assets, "frames/vertical.png", 7, 4)
         val before = tree(assets)
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 frame("glyph_65", "frames/shared.png")
                 frame("also_shared", "frames/shared.png")
                 frame("slice_left", "frames/left.png")
@@ -577,7 +577,7 @@ class ThemePackContributionTest {
     @Test
     fun `rejects frame texture names that sanitize to the same path`() {
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 frame("first", "frames/a!.png")
                 frame("second", "frames/a?.png")
             }
@@ -599,7 +599,7 @@ class ThemePackContributionTest {
         png(assets, "frames/wide.png", 257, 1)
         png(assets, "frames/tall.png", 4, 257)
         listOf("frames/min.png", "frames/max.png").forEach { texture ->
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                     frame("frame_${texture.substringAfterLast('/').substringBefore('.')}", texture)
                 }
                 .toPackContribution(assets)
@@ -607,7 +607,7 @@ class ThemePackContributionTest {
         listOf("frames/narrow.png", "frames/wide.png", "frames/tall.png").forEach { texture ->
             val failure =
                 assertFailsWith<IllegalArgumentException> {
-                    theme("grounds", GuiPackFormat(88)) { frame("bad", texture) }
+                    theme("grounds", GuiPackFormat(97)) { frame("bad", texture) }
                         .toPackContribution(assets)
                 }
             assertTrue("grounds" in failure.message.orEmpty(), failure.message.orEmpty())
@@ -619,7 +619,7 @@ class ThemePackContributionTest {
         }
         val missing =
             assertFailsWith<IllegalArgumentException> {
-                theme("grounds", GuiPackFormat(88)) { frame("missing", "frames/missing.png") }
+                theme("grounds", GuiPackFormat(97)) { frame("missing", "frames/missing.png") }
                     .toPackContribution(assets)
             }
         assertTrue("grounds" in missing.message.orEmpty(), missing.message.orEmpty())
@@ -636,7 +636,7 @@ class ThemePackContributionTest {
         val afterInputs = tree(assets)
         val unreadable =
             assertFailsWith<IllegalArgumentException> {
-                theme("grounds", GuiPackFormat(88)) { frame("broken", "frames/broken.png") }
+                theme("grounds", GuiPackFormat(97)) { frame("broken", "frames/broken.png") }
                     .toPackContribution(assets)
             }
         assertTrue("grounds" in unreadable.message.orEmpty(), unreadable.message.orEmpty())
@@ -654,7 +654,7 @@ class ThemePackContributionTest {
         val assets = createTempDirectory("assets")
         png(assets, "frames/outline.png", 4, 1)
         val ordered =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 frame("outline", "frames/outline.png")
                 colour("zinc", 0xA0B0C0)
                 colour("amber", 0x102030)
@@ -663,7 +663,7 @@ class ThemePackContributionTest {
             text(ordered.toPackContribution(assets), "assets/minecraft/shaders/core/text.vsh")
         val empty =
             text(
-                theme("grounds", GuiPackFormat(88)) { frame("outline", "frames/outline.png") }
+                theme("grounds", GuiPackFormat(97)) { frame("outline", "frames/outline.png") }
                     .toPackContribution(assets),
                 "assets/minecraft/shaders/core/text.vsh",
             )
@@ -681,7 +681,7 @@ class ThemePackContributionTest {
         png(assets, "highlight/back.png", 8, 7)
         png(assets, "highlight/front.png", 8, 8)
         val subject =
-            theme("grounds", GuiPackFormat(88)) {
+            theme("grounds", GuiPackFormat(97)) {
                 slotHighlight("highlight/back.png", "highlight/front.png")
             }
 
@@ -696,7 +696,7 @@ class ThemePackContributionTest {
     @Test
     fun `rejects a frame theme whose pack range includes an older shader format`() {
         val subject =
-            theme("grounds", GuiPackFormat(88, minInclusive = 84, maxInclusive = 88)) {
+            theme("grounds", GuiPackFormat(97, minInclusive = 93, maxInclusive = 97)) {
                 frame("outline", "frame/outline.png")
             }
 
@@ -706,7 +706,7 @@ class ThemePackContributionTest {
             }
 
         assertEquals(
-            "Theme 'grounds' uses the Minecraft 26.2 text shader and must declare pack format range 88..88, but declares 84..88.",
+            "Theme 'grounds' uses the Minecraft 26.3 text shader and must declare pack format range 97..97, but declares 93..97.",
             failure.message,
         )
     }
@@ -717,7 +717,7 @@ class ThemePackContributionTest {
         val assets = createTempDirectory("assets")
         png(assets, "frame/outline.png", 8, 8)
         val subject =
-            theme("grounds", GuiPackFormat(88, minInclusive = 84, maxInclusive = 88)) {
+            theme("grounds", GuiPackFormat(97, minInclusive = 93, maxInclusive = 97)) {
                 frame("outline", "frame/outline.png")
             }
 
@@ -727,7 +727,7 @@ class ThemePackContributionTest {
             }
 
         assertEquals(
-            "Theme 'grounds' uses the Minecraft 26.2 text shader and must declare pack format range 88..88, but declares 84..88.",
+            "Theme 'grounds' uses the Minecraft 26.3 text shader and must declare pack format range 97..97, but declares 93..97.",
             failure.message,
         )
     }

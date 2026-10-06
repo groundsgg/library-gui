@@ -37,9 +37,9 @@ class DemoThemeTest {
     fun `theme declares the exact shader pack format`() {
         val format = DemoTheme.current().packFormat
 
-        assertEquals(88, format.format)
-        assertEquals(88, format.minInclusive)
-        assertEquals(88, format.maxInclusive)
+        assertEquals(97, format.format)
+        assertEquals(97, format.minInclusive)
+        assertEquals(97, format.maxInclusive)
     }
 
     @Test

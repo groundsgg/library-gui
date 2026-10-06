@@ -24,14 +24,14 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 
 class ThemePackParityTest {
     @Test
-    fun `minimal exact 88 theme writes the same assets through both public pack APIs`() =
-        assertParity(theme("minimal", PackFormat(88)), createTempDirectory("minimal-assets"))
+    fun `minimal exact 97 theme writes the same assets through both public pack APIs`() =
+        assertParity(theme("minimal", PackFormat(97)), createTempDirectory("minimal-assets"))
 
     @Test
-    fun `full exact 88 theme writes the same assets through both public pack APIs`() {
+    fun `full exact 97 theme writes the same assets through both public pack APIs`() {
         val assets = createTempDirectory("full-assets")
         val subject =
-            theme("grounds", PackFormat(88)) {
+            theme("grounds", PackFormat(97)) {
                 description = "Complete GUI"
                 panel("shop", png(assets, "panels/shop.png", 176, 166), 176, 166)
                 icon("sword", png(assets, "icons/sword.png", 16, 16))
@@ -56,7 +56,7 @@ class ThemePackParityTest {
     @Test
     fun `parity traversal excludes a file symlink under assets`() =
         assertParity(
-            theme("symlink", PackFormat(88)),
+            theme("symlink", PackFormat(97)),
             createTempDirectory("symlink-assets"),
             addLegacyFileSymlink = true,
         )
@@ -68,7 +68,7 @@ class ThemePackParityTest {
         val output = createTempDirectory("compat-output").resolve("pack")
         val archive = output.resolveSibling("pack.zip")
 
-        writePack(theme("compat", PackFormat(88)), assets, output)
+        writePack(theme("compat", PackFormat(97)), assets, output)
         zipPack(output, archive)
 
         assertTrue(Files.exists(archive))

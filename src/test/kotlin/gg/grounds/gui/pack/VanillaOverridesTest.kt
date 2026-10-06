@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
  * the bundle sprites and the language file.
  */
 class VanillaOverridesTest {
-    private val format = PackFormat(88)
+    private val format = PackFormat(97)
 
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     private fun written(subject: Theme, assets: Path): List<String> {

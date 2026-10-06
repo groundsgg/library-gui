@@ -202,7 +202,7 @@ object DemoTheme {
 
     /** The theme as currently tuned. */
     fun current(): Theme =
-        theme(NAMESPACE, PackFormat(88)) {
+        theme(NAMESPACE, PackFormat(97)) {
             description = "library-gui theme demo"
             panel(PANEL, "panels/shop.png", PANEL_W, PANEL_H, offsetX = offsetX, offsetY = offsetY)
             listOf("screen_shop" to (176 to 222), "screen_toolbar" to (176 to 133),
