@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/groundsgg/library-gui/compare/v1.0.0...v1.0.1) (2026-10-14)
+
+
+### Bug Fixes
+
+* **deps:** expose library-i18n 0.3.0 ([#48](https://github.com/groundsgg/library-gui/issues/48)) ([d541759](https://github.com/groundsgg/library-gui/commit/d541759bc8e61cfb8c306f1f1eb4d788a7ead1a7))
+
 ## [1.0.0](https://github.com/groundsgg/library-gui/compare/v0.13.1...v1.0.0) (2026-10-06)
 
 
