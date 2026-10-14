@@ -49,7 +49,7 @@ dependencies {
     compileOnly("net.minestom:minestom:$minestomVersion")
     // Per-player GUIs render per-player language; adventure itself comes from
     // Minestom (library-i18n declares it compileOnly), so nothing doubles up.
-    api("gg.grounds:library-i18n:0.1.1")
+    api("gg.grounds:library-i18n:0.3.0")
     api("gg.grounds:resource-pack-api:$resourcePackVersion")
 
     testImplementation(kotlin("test"))
